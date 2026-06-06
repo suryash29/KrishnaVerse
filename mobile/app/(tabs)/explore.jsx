@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { SHLOKAS, CHAPTERS, searchShlokas } from '../../constants/Shlokas';
+import { SHLOKAS, CHAPTERS, searchShlokas, getShlokasByChapter } from '../../constants/Shlokas';
 import { Colors } from '../../constants/Colors';
 import { useApp } from '../../context/AppContext';
 
@@ -15,6 +15,7 @@ export default function ExploreScreen() {
   const [activeTab, setActiveTab] = useState('Chapters');
   const [query, setQuery] = useState('');
   const [selectedShloka, setSelectedShloka] = useState(null);
+  const [selectedChapter, setSelectedChapter] = useState(null);
   const { toggleBookmark, isBookmarked } = useApp();
 
   const searchResults = useMemo(() => {
@@ -22,7 +23,13 @@ export default function ExploreScreen() {
     return searchShlokas(query.trim());
   }, [query]);
 
+  const chapterVerses = useMemo(
+    () => (selectedChapter ? getShlokasByChapter(selectedChapter.num) : []),
+    [selectedChapter]
+  );
+
   function ShlokaItem({ item }) {
+    const tags = Array.isArray(item.tags) ? item.tags.slice(0, 3) : [];
     return (
       <TouchableOpacity style={styles.shlokaItem} onPress={() => setSelectedShloka(item)} activeOpacity={0.8}>
         <View style={styles.shlokaItemHeader}>
@@ -33,21 +40,24 @@ export default function ExploreScreen() {
         </View>
         <Text style={styles.shlokaChapter}>{item.chapterTitle}</Text>
         <Text style={styles.shlokaEnglish} numberOfLines={3}>{item.english}</Text>
-        <View style={styles.tagRow}>
-          {item.tags.slice(0, 3).map(tag => (
-            <View key={tag} style={styles.tag}>
-              <Text style={styles.tagText}>{tag}</Text>
-            </View>
-          ))}
-        </View>
+        {tags.length > 0 && (
+          <View style={styles.tagRow}>
+            {tags.map(tag => (
+              <View key={tag} style={styles.tag}>
+                <Text style={styles.tagText}>{tag}</Text>
+              </View>
+            ))}
+          </View>
+        )}
       </TouchableOpacity>
     );
   }
 
+  // List of all 18 chapters; tapping one opens its full verse list.
   function ChaptersView() {
     const grouped = CHAPTERS.map(ch => ({
       ...ch,
-      shlokas: SHLOKAS.filter(s => s.chapter === ch.num),
+      count: SHLOKAS.filter(s => s.chapter === ch.num).length,
     }));
     return (
       <FlatList
@@ -57,9 +67,7 @@ export default function ExploreScreen() {
         renderItem={({ item }) => (
           <TouchableOpacity
             style={styles.chapterCard}
-            onPress={() => {
-              if (item.shlokas.length > 0) setSelectedShloka(item.shlokas[0]);
-            }}
+            onPress={() => setSelectedChapter(item)}
             activeOpacity={0.85}
           >
             <View style={styles.chapterNumBadge}>
@@ -68,10 +76,9 @@ export default function ExploreScreen() {
             <View style={{ flex: 1 }}>
               <Text style={styles.chapterTitle}>{item.title}</Text>
               <Text style={styles.chapterSub}>{item.subtitle}</Text>
-              {item.shlokas.length > 0 && (
-                <Text style={styles.chapterCount}>{item.shlokas.length} shloka{item.shlokas.length !== 1 ? 's' : ''} available</Text>
-              )}
+              <Text style={styles.chapterCount}>{item.count} verse{item.count !== 1 ? 's' : ''}</Text>
             </View>
+            <Text style={styles.chapterChevron}>›</Text>
           </TouchableOpacity>
         )}
       />
@@ -122,7 +129,29 @@ export default function ExploreScreen() {
       )}
 
       {/* Content */}
-      {activeTab === 'Chapters' && <ChaptersView />}
+      {activeTab === 'Chapters' && !selectedChapter && <ChaptersView />}
+
+      {activeTab === 'Chapters' && selectedChapter && (
+        <FlatList
+          data={chapterVerses}
+          keyExtractor={item => item.id}
+          contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 40 }}
+          ListHeaderComponent={
+            <View style={{ marginBottom: 6 }}>
+              <TouchableOpacity style={styles.backBtn} onPress={() => setSelectedChapter(null)}>
+                <Text style={styles.backBtnText}>← All Chapters</Text>
+              </TouchableOpacity>
+              <View style={styles.chapterHead}>
+                <Text style={styles.chapterHeadNum}>Chapter {selectedChapter.num}</Text>
+                <Text style={styles.chapterHeadTitle}>{selectedChapter.title}</Text>
+                <Text style={styles.chapterHeadSub}>{selectedChapter.subtitle}</Text>
+                <Text style={styles.chapterHeadCount}>{chapterVerses.length} verses</Text>
+              </View>
+            </View>
+          }
+          renderItem={({ item }) => <ShlokaItem item={item} />}
+        />
+      )}
 
       {activeTab === 'All Shlokas' && (
         <FlatList
@@ -175,23 +204,41 @@ export default function ExploreScreen() {
               <View style={styles.modalDivider} />
               <Text style={styles.modalLabel}>ENGLISH</Text>
               <Text style={styles.modalEnglish}>{selectedShloka.english}</Text>
-              <Text style={styles.modalLabel}>HINDI</Text>
-              <Text style={styles.modalHindi}>{selectedShloka.hindi}</Text>
-              <Text style={styles.modalLabel}>CONTEXT</Text>
-              <Text style={styles.modalBody}>{selectedShloka.context}</Text>
-              <Text style={styles.modalLabel}>MEANING</Text>
-              <Text style={styles.modalBody}>{selectedShloka.explanation}</Text>
-              <Text style={styles.modalLabel}>LIFE APPLICATION</Text>
-              <View style={styles.applicationBox}>
-                <Text style={styles.applicationText}>{selectedShloka.lifeApplication}</Text>
-              </View>
-              <View style={styles.tagRow}>
-                {selectedShloka.tags.map(tag => (
-                  <View key={tag} style={styles.tag}>
-                    <Text style={styles.tagText}>{tag}</Text>
+              {!!selectedShloka.hindi && (
+                <>
+                  <Text style={styles.modalLabel}>HINDI</Text>
+                  <Text style={styles.modalHindi}>{selectedShloka.hindi}</Text>
+                </>
+              )}
+              {!!selectedShloka.context && (
+                <>
+                  <Text style={styles.modalLabel}>CONTEXT</Text>
+                  <Text style={styles.modalBody}>{selectedShloka.context}</Text>
+                </>
+              )}
+              {!!selectedShloka.explanation && (
+                <>
+                  <Text style={styles.modalLabel}>MEANING</Text>
+                  <Text style={styles.modalBody}>{selectedShloka.explanation}</Text>
+                </>
+              )}
+              {!!selectedShloka.lifeApplication && (
+                <>
+                  <Text style={styles.modalLabel}>LIFE APPLICATION</Text>
+                  <View style={styles.applicationBox}>
+                    <Text style={styles.applicationText}>{selectedShloka.lifeApplication}</Text>
                   </View>
-                ))}
-              </View>
+                </>
+              )}
+              {Array.isArray(selectedShloka.tags) && selectedShloka.tags.length > 0 && (
+                <View style={styles.tagRow}>
+                  {selectedShloka.tags.map(tag => (
+                    <View key={tag} style={styles.tag}>
+                      <Text style={styles.tagText}>{tag}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
             </ScrollView>
           </SafeAreaView>
         )}
@@ -344,6 +391,58 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     marginTop: 4,
     fontWeight: '600',
+  },
+  chapterChevron: {
+    fontSize: 26,
+    color: Colors.textMuted,
+    marginLeft: 4,
+  },
+  backBtn: {
+    alignSelf: 'flex-start',
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginBottom: 12,
+  },
+  backBtnText: {
+    color: Colors.primary,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  chapterHead: {
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 6,
+  },
+  chapterHeadNum: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.primary,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  chapterHeadTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.text,
+    marginTop: 2,
+  },
+  chapterHeadSub: {
+    fontSize: 13,
+    color: Colors.textMuted,
+    marginTop: 2,
+  },
+  chapterHeadCount: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    fontWeight: '600',
+    marginTop: 8,
   },
   emptyState: {
     alignItems: 'center',

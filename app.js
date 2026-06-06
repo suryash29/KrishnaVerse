@@ -344,6 +344,13 @@ function renderExplore() {
   renderChaptersList();
   renderTopicsGrid();
   renderAllShlokasList();
+  // Always (re)enter Explore on the Chapters tab, never stuck inside a chapter view.
+  const tabsEl = document.getElementById('exploreTabs');
+  if (tabsEl) tabsEl.style.display = '';
+  const chapterView = document.getElementById('expChapter');
+  if (chapterView) chapterView.classList.add('hidden');
+  document.querySelectorAll('#exploreTabs .exp-tab').forEach((b, i) => b.classList.toggle('active', i === 0));
+  showExpView('chapters');
 }
 
 function renderChaptersList() {
@@ -385,31 +392,90 @@ function renderAllShlokasList() {
 
 function renderShlokaListCard(shloka) {
   const isBookmarked = STATE.bookmarks.includes(shloka.id);
+  const firstLine = (shloka.sanskrit || '').split('\n')[0] || '';
+  const tags = Array.isArray(shloka.tags) ? shloka.tags.slice(0, 3) : [];
+  const tagsHTML = tags.length
+    ? `<div class="slc-tags">${tags.map(t => `<span class="slc-tag">${t}</span>`).join('')}</div>`
+    : '';
   return `
     <div class="shloka-list-card" onclick="openShlokaDetail(getShlokaById('${shloka.id}'))">
       <div class="slc-header">
         <span class="slc-ref">BG ${shloka.chapter}.${shloka.verse}</span>
         <span class="slc-bm ${isBookmarked ? 'bookmarked' : ''}">${isBookmarked ? '🔖' : '○'}</span>
       </div>
-      <div class="slc-sanskrit">${shloka.sanskrit.split('\n')[0]}...</div>
-      <div class="slc-english">${shloka.english}</div>
-      <div class="slc-tags">${shloka.tags.slice(0, 3).map(t => `<span class="slc-tag">${t}</span>`).join('')}</div>
+      <div class="slc-sanskrit">${firstLine}</div>
+      <div class="slc-english">${shloka.english || ''}</div>
+      ${tagsHTML}
     </div>
   `;
 }
 
+// Show ALL verses of a chapter as a scrollable list (with a back button).
 function showChapterShlokas(chapterNum) {
-  const shlokas = SHLOKAS.filter(s => s.chapter === chapterNum);
+  const shlokas = SHLOKAS.filter(s => s.chapter === chapterNum)
+    .sort((a, b) => a.verse - b.verse);
   const chapter = CHAPTERS.find(c => c.num === chapterNum);
   if (!shlokas.length) return showToast(`No shlokas loaded for Chapter ${chapterNum} yet`);
-  // Show first shloka from that chapter
-  openShlokaDetail(shlokas[0]);
+
+  const headerEl = document.getElementById('chapterDetailHeader');
+  if (headerEl && chapter) {
+    headerEl.innerHTML = `
+      <div class="chapter-detail-head">
+        <div class="cdh-num">Chapter ${chapter.num}</div>
+        <div class="cdh-title">${chapter.title}</div>
+        <div class="cdh-hindi">${chapter.hindi}</div>
+        <div class="cdh-theme">${chapter.theme || ''}</div>
+        <div class="cdh-count">${shlokas.length} verses</div>
+      </div>
+    `;
+  }
+
+  const listEl = document.getElementById('chapterShlokasList');
+  if (listEl) listEl.innerHTML = shlokas.map(s => renderShlokaListCard(s)).join('');
+
+  // Swap to the single-chapter view.
+  document.querySelectorAll('.exp-view').forEach(v => v.classList.add('hidden'));
+  const view = document.getElementById('expChapter');
+  if (view) view.classList.remove('hidden');
+  const tabsEl = document.getElementById('exploreTabs');
+  if (tabsEl) tabsEl.style.display = 'none';
+  // Scroll the explore screen back to top for the new list.
+  const scroller = document.querySelector('#screen-explore .screen-scroll') || document.getElementById('expChapter');
+  if (scroller && scroller.scrollTo) scroller.scrollTo({ top: 0 });
 }
 
+// Return from a single chapter back to the chapters list.
+function closeChapterView() {
+  const tabsEl = document.getElementById('exploreTabs');
+  if (tabsEl) tabsEl.style.display = '';
+  showExpView('chapters');
+  const activeTab = document.querySelector('#exploreTabs .exp-tab');
+  document.querySelectorAll('#exploreTabs .exp-tab').forEach(b => b.classList.remove('active'));
+  if (activeTab) activeTab.classList.add('active');
+}
+
+// Show all verses tagged to a wisdom topic, as a list.
 function showTopicShlokas(categoryId, label) {
   const shlokas = getShlokasByCategory(categoryId);
   if (!shlokas.length) return showToast('No shlokas for this topic yet');
-  openShlokaDetail(shlokas[0]);
+
+  const headerEl = document.getElementById('chapterDetailHeader');
+  if (headerEl) {
+    headerEl.innerHTML = `
+      <div class="chapter-detail-head">
+        <div class="cdh-title">${label}</div>
+        <div class="cdh-count">${shlokas.length} shloka${shlokas.length !== 1 ? 's' : ''}</div>
+      </div>
+    `;
+  }
+  const listEl = document.getElementById('chapterShlokasList');
+  if (listEl) listEl.innerHTML = shlokas.map(s => renderShlokaListCard(s)).join('');
+
+  document.querySelectorAll('.exp-view').forEach(v => v.classList.add('hidden'));
+  const view = document.getElementById('expChapter');
+  if (view) view.classList.remove('hidden');
+  const tabsEl = document.getElementById('exploreTabs');
+  if (tabsEl) tabsEl.style.display = 'none';
 }
 
 // ── Search ─────────────────────────────────────────────────
@@ -480,7 +546,7 @@ function openShlokaDetail(shloka) {
   const langContent = STATE.language === 'hi' ? shloka.hindi :
                       STATE.language === 'sa' ? shloka.transliteration : shloka.english;
 
-  const wordByWordHTML = shloka.wordByWord ? `
+  const wordByWordHTML = (Array.isArray(shloka.wordByWord) && shloka.wordByWord.length) ? `
     <div class="sd-section-label">Word by Word</div>
     <div class="sd-word-grid">
       ${shloka.wordByWord.map(w => `
@@ -491,6 +557,19 @@ function openShlokaDetail(shloka) {
       `).join('')}
     </div>
   ` : '';
+
+  // Rich teaching fields exist only for curated verses — render them only when present.
+  const contextHTML = shloka.context ? `
+      <div class="sd-section-label">Context</div>
+      <div class="sd-box"><p>${shloka.context}</p></div>` : '';
+
+  const explanationHTML = shloka.explanation ? `
+      <div class="sd-section-label">Understanding</div>
+      <div class="sd-box"><p>${shloka.explanation}</p></div>` : '';
+
+  const lifeAppHTML = shloka.lifeApplication ? `
+      <div class="sd-section-label">💡 Life Application</div>
+      <div class="sd-box" style="border-left-color:var(--gold)"><p>${shloka.lifeApplication}</p></div>` : '';
 
   document.getElementById('shlokaDetailBody').innerHTML = `
     <div style="padding-top:8px">
@@ -504,17 +583,12 @@ function openShlokaDetail(shloka) {
       ${wordByWordHTML}
 
       <div class="sd-section-label">${STATE.language === 'hi' ? 'अनुवाद' : 'Translation'}</div>
-      ${STATE.language !== 'en' ? `<div class="sd-hindi" style="margin-bottom:8px">${shloka.hindi}</div>` : ''}
+      ${STATE.language !== 'en' && shloka.hindi ? `<div class="sd-hindi" style="margin-bottom:8px">${shloka.hindi}</div>` : ''}
       <div class="sd-translation">${shloka.english}</div>
 
-      <div class="sd-section-label">Context</div>
-      <div class="sd-box"><p>${shloka.context}</p></div>
-
-      <div class="sd-section-label">Understanding</div>
-      <div class="sd-box"><p>${shloka.explanation}</p></div>
-
-      <div class="sd-section-label">💡 Life Application</div>
-      <div class="sd-box" style="border-left-color:var(--gold)"><p>${shloka.lifeApplication}</p></div>
+      ${contextHTML}
+      ${explanationHTML}
+      ${lifeAppHTML}
 
       ${hasNote ? `
         <div class="sd-section-label">My Note</div>

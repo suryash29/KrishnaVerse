@@ -1,7 +1,14 @@
 // KrishnaVerse – Bhagavad Gita Shloka Dataset (Mobile)
 // Ported from data/shlokas.js for React Native
+//
+// CURATED_SHLOKAS hold the richly-annotated verses (context, explanation,
+// life application, word-by-word, tags, moods). They are merged on top of the
+// complete 700-verse base (constants/GitaVerses.js → BG_VERSES) so the exported
+// SHLOKAS array contains every verse of all 18 chapters with no gaps.
 
-export const SHLOKAS = [
+import { BG_VERSES } from './GitaVerses';
+
+const CURATED_SHLOKAS = [
   {
     id: "BG_2_47",
     chapter: 2, verse: 47,
@@ -244,6 +251,19 @@ export const SHLOKAS = [
   },
 ];
 
+// Build the COMPLETE verse set: full 700-verse base overlaid with curated rich verses.
+export const SHLOKAS = (() => {
+  const base = Array.isArray(BG_VERSES) ? BG_VERSES : [];
+  if (!base.length) return CURATED_SHLOKAS.slice();
+  const curatedById = {};
+  CURATED_SHLOKAS.forEach(c => { curatedById[c.id] = c; });
+  const merged = base.map(v => (curatedById[v.id] ? { ...v, ...curatedById[v.id] } : v));
+  base.forEach(v => { delete curatedById[v.id]; });
+  Object.values(curatedById).forEach(c => merged.push(c));
+  merged.sort((a, b) => a.chapter - b.chapter || a.verse - b.verse);
+  return merged;
+})();
+
 export const MOODS = [
   { id: "peaceful", label: "Peaceful", emoji: "😌", color: "#4CAF50" },
   { id: "happy", label: "Happy", emoji: "😊", color: "#8BC34A" },
@@ -321,26 +341,41 @@ export const AI_RESPONSES = {
   }
 };
 
+// Rotate the daily verse over the curated set so it always has rich content.
 export function getTodayShloka() {
   const today = new Date();
   const dayOfYear = Math.floor((today - new Date(today.getFullYear(), 0, 0)) / 86400000);
-  return SHLOKAS[dayOfYear % SHLOKAS.length];
+  const pool = (CURATED_SHLOKAS && CURATED_SHLOKAS.length) ? CURATED_SHLOKAS : SHLOKAS;
+  return pool[dayOfYear % pool.length];
 }
 
 export function getShlokaById(id) {
   return SHLOKAS.find(s => s.id === id);
 }
 
+// Verses of a single chapter, in order.
+export function getShlokasByChapter(chapterNum) {
+  return SHLOKAS.filter(s => s.chapter === chapterNum).sort((a, b) => a.verse - b.verse);
+}
+
+// Null-safe search across the full 700-verse set.
 export function searchShlokas(query) {
-  const q = query.toLowerCase();
-  return SHLOKAS.filter(s =>
-    s.english.toLowerCase().includes(q) ||
-    s.hindi.includes(q) ||
-    s.tags.some(t => t.includes(q)) ||
-    s.chapterTitle.toLowerCase().includes(q) ||
-    s.explanation.toLowerCase().includes(q) ||
-    `BG ${s.chapter}.${s.verse}`.toLowerCase().includes(q)
-  );
+  const q = (query || '').toLowerCase().trim();
+  if (!q) return [];
+  return SHLOKAS.filter(s => {
+    const tags = Array.isArray(s.tags) ? s.tags.join(' ') : '';
+    return (
+      (s.english || '').toLowerCase().includes(q) ||
+      (s.hindi || '').includes(q) ||
+      (s.transliteration || '').toLowerCase().includes(q) ||
+      (s.sanskrit || '').includes(q) ||
+      tags.toLowerCase().includes(q) ||
+      (s.chapterTitle || '').toLowerCase().includes(q) ||
+      (s.explanation || '').toLowerCase().includes(q) ||
+      `bg ${s.chapter}.${s.verse}`.includes(q) ||
+      `${s.chapter}.${s.verse}`.includes(q)
+    );
+  });
 }
 
 export function getAIResponse(userMessage) {

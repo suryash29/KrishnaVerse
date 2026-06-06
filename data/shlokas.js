@@ -1,7 +1,11 @@
 // Krishna Guide – Bhagavad Gita Shloka Dataset
-// 24 carefully selected shlokas with complete translations & life applications
+// CURATED_SHLOKAS: carefully selected verses with rich annotations
+// (word-by-word, context, explanation & life application). These are MERGED
+// on top of the complete 700-verse base (data/gita-verses.js → BG_VERSES) so
+// the final SHLOKAS array contains every verse of all 18 chapters with no gaps,
+// while these curated verses keep their extra teaching fields.
 
-const SHLOKAS = [
+const CURATED_SHLOKAS = [
   {
     id: "BG_2_47",
     chapter: 2, verse: 47,
@@ -462,6 +466,35 @@ const SHLOKAS = [
   }
 ];
 
+// ── Build the COMPLETE verse set ───────────────────────────
+// Start from the full 700-verse base (BG_VERSES from data/gita-verses.js),
+// then overlay the curated verses so their rich fields (explanation,
+// lifeApplication, wordByWord, tags, moods, categories) are preserved.
+const SHLOKAS = (function buildCompleteShlokas() {
+  const base = (typeof BG_VERSES !== 'undefined' && Array.isArray(BG_VERSES)) ? BG_VERSES : [];
+  const curatedById = {};
+  CURATED_SHLOKAS.forEach(c => { curatedById[c.id] = c; });
+
+  if (!base.length) {
+    // Fallback: if the base failed to load, at least use the curated set.
+    return CURATED_SHLOKAS.slice();
+  }
+
+  const merged = base.map(v => {
+    const c = curatedById[v.id];
+    // Curated fields win; base fills any gaps (e.g. translations).
+    return c ? Object.assign({}, v, c) : v;
+  });
+
+  // Include any curated verse that isn't present in the base (safety net).
+  base.forEach(v => { delete curatedById[v.id]; });
+  Object.values(curatedById).forEach(c => merged.push(c));
+
+  // Keep canonical order: chapter, then verse.
+  merged.sort((a, b) => a.chapter - b.chapter || a.verse - b.verse);
+  return merged;
+})();
+
 // Chapters summary data
 const CHAPTERS = [
   { num: 1, title: "Arjuna Vishada Yoga", hindi: "अर्जुन विषाद योग", summary: "The Distress of Arjuna", verses: 47, theme: "Arjuna's grief and confusion on the battlefield — the catalyst for the entire Gita teaching." },
@@ -483,6 +516,13 @@ const CHAPTERS = [
   { num: 17, title: "Shraddha Traya Vibhaga Yoga", hindi: "श्रद्धात्रय विभाग योग", summary: "The Threefold Faith", verses: 28, theme: "How faith, food, sacrifice, and austerity differ according to the three gunas." },
   { num: 18, title: "Moksha Yoga", hindi: "मोक्ष योग", summary: "The Yoga of Liberation", verses: 78, theme: "The grand conclusion — renunciation, devotion, action, and the ultimate surrender to God." }
 ];
+
+// Reconcile each chapter's verse count with the verses actually loaded,
+// so the Explore chapter badges are always accurate (no gaps, no over-count).
+CHAPTERS.forEach(ch => {
+  const n = SHLOKAS.filter(s => s.chapter === ch.num).length;
+  if (n) ch.verses = n;
+});
 
 // Categories for Situation-Based Wisdom
 const WISDOM_CATEGORIES = [
@@ -554,11 +594,13 @@ const AI_RESPONSES = {
   }
 };
 
-// Get today's shloka (deterministic based on date)
+// Get today's shloka (deterministic based on date).
+// Rotate over the CURATED set so the daily verse always has rich teaching content.
 function getTodayShloka() {
   const today = new Date();
   const dayOfYear = Math.floor((today - new Date(today.getFullYear(), 0, 0)) / 86400000);
-  return SHLOKAS[dayOfYear % SHLOKAS.length];
+  const pool = (typeof CURATED_SHLOKAS !== 'undefined' && CURATED_SHLOKAS.length) ? CURATED_SHLOKAS : SHLOKAS;
+  return pool[dayOfYear % pool.length];
 }
 
 // Get shloka by ID
@@ -576,17 +618,24 @@ function getShlokasByMood(mood) {
   return SHLOKAS.filter(s => s.moods && s.moods.includes(mood));
 }
 
-// Search shlokas
+// Search shlokas (null-safe across the full 700-verse set)
 function searchShlokas(query) {
-  const q = query.toLowerCase();
-  return SHLOKAS.filter(s =>
-    s.english.toLowerCase().includes(q) ||
-    s.hindi.includes(q) ||
-    s.tags.some(t => t.includes(q)) ||
-    s.chapterTitle.toLowerCase().includes(q) ||
-    s.explanation.toLowerCase().includes(q) ||
-    `BG ${s.chapter}.${s.verse}`.toLowerCase().includes(q)
-  );
+  const q = (query || '').toLowerCase().trim();
+  if (!q) return [];
+  return SHLOKAS.filter(s => {
+    const tags = Array.isArray(s.tags) ? s.tags.join(' ') : '';
+    return (
+      (s.english || '').toLowerCase().includes(q) ||
+      (s.hindi || '').includes(q) ||
+      (s.transliteration || '').toLowerCase().includes(q) ||
+      (s.sanskrit || '').includes(q) ||
+      tags.toLowerCase().includes(q) ||
+      (s.chapterTitle || '').toLowerCase().includes(q) ||
+      (s.explanation || '').toLowerCase().includes(q) ||
+      `bg ${s.chapter}.${s.verse}`.includes(q) ||
+      `${s.chapter}.${s.verse}`.includes(q)
+    );
+  });
 }
 
 // Get AI response for user query
