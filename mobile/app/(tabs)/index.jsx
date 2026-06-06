@@ -47,10 +47,7 @@ export default function HomeScreen() {
             <Text style={styles.streakFire}>🔥</Text>
             <Text style={styles.streakNum}>{streak.current}</Text>
           </View>
-          <TouchableOpacity onPress={() => Alert.alert('Sign Out', 'Are you sure?', [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Sign Out', style: 'destructive', onPress: logout },
-          ])}>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/profile')}>
             <View style={styles.avatarBtn}>
               <Text style={styles.avatarText}>{firstName[0].toUpperCase()}</Text>
             </View>
@@ -77,7 +74,9 @@ export default function HomeScreen() {
               <Text style={styles.sanskrit}>{todayShloka.sanskrit}</Text>
               <View style={styles.divider} />
               <Text style={styles.translation}>{todayShloka.english}</Text>
-              <Text style={styles.application}>{todayShloka.lifeApplication}</Text>
+              {!!todayShloka.lifeApplication && (
+                <Text style={styles.application}>{todayShloka.lifeApplication}</Text>
+              )}
             </LinearGradient>
           </View>
         )}

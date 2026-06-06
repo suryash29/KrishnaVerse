@@ -2,7 +2,7 @@
    KrishnaVerse – Service Worker (Offline-first PWA)
    ═══════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'krishnaverse-v4';
+const CACHE_NAME = 'krishnaverse-v5';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

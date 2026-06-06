@@ -1,5 +1,7 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from './AuthContext';
+import { loadUserData, saveUserData, mergeCloudIntoState } from '../services/cloud';
 
 const AppContext = createContext(null);
 const STORAGE_KEY = 'krishnaverse_v1';
@@ -16,10 +18,13 @@ const defaultState = {
 };
 
 export function AppProvider({ children }) {
+  const { user } = useAuth();
   const [state, setState] = useState(defaultState);
   const [loaded, setLoaded] = useState(false);
+  const [cloudSynced, setCloudSynced] = useState(false);
+  const cloudTimer = useRef(null);
 
-  // Load from storage on mount
+  // Load from local storage on mount
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY).then(raw => {
       if (raw) {
@@ -32,7 +37,7 @@ export function AppProvider({ children }) {
     });
   }, []);
 
-  // Persist on every state change
+  // Persist locally on every state change
   useEffect(() => {
     if (!loaded) return;
     const { darkMode, language, bookmarks, notes, journal, moodHistory, streak } = state;
@@ -40,6 +45,32 @@ export function AppProvider({ children }) {
       darkMode, language, bookmarks, notes, journal, moodHistory, streak
     })).catch(() => {});
   }, [state, loaded]);
+
+  // When the signed-in user changes, pull their cloud data and merge it
+  // into local state (union — never lose local-only entries).
+  useEffect(() => {
+    if (!user) { setCloudSynced(false); return; }
+    if (!loaded) return;
+    let active = true;
+    (async () => {
+      const cloud = await loadUserData(user.uid);
+      if (!active) return;
+      if (cloud) setState(prev => mergeCloudIntoState(prev, cloud));
+      setCloudSynced(true);
+    })();
+    return () => { active = false; };
+  }, [user, loaded]);
+
+  // Mirror state to the cloud (debounced) once synced and signed in.
+  useEffect(() => {
+    if (!loaded || !user || !cloudSynced) return;
+    if (cloudTimer.current) clearTimeout(cloudTimer.current);
+    const { darkMode, language, bookmarks, notes, journal, moodHistory, streak } = state;
+    cloudTimer.current = setTimeout(() => {
+      saveUserData(user.uid, { darkMode, language, bookmarks, notes, journal, moodHistory, streak });
+    }, 1200);
+    return () => { if (cloudTimer.current) clearTimeout(cloudTimer.current); };
+  }, [state, loaded, user, cloudSynced]);
 
   function update(partial) {
     setState(prev => ({ ...prev, ...partial }));

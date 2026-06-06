@@ -17,7 +17,11 @@ import {
   createUserWithEmailAndPassword,
   signOut,
   updateProfile,
+  updatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
   sendPasswordResetEmail,
+  sendEmailVerification,
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import {
   getFirestore,
@@ -59,7 +63,11 @@ export {
   createUserWithEmailAndPassword,
   signOut,
   updateProfile,
+  updatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
   sendPasswordResetEmail,
+  sendEmailVerification,
   // firestore
   db,
   collection,

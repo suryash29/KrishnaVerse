@@ -91,12 +91,14 @@ Emojis are fine to launch, but real photos sell better. Two easy options:
 
 Tapping a product opens **WhatsApp** with a pre-filled message (product + price). Zero payment-gateway setup, no fees — perfect to launch.
 
-- **Web:** set your number once in `app.js` → `window.SHOP_WHATSAPP = '919812345678';` (country code, no `+`).
-- **Mobile:** set `SHOP_WHATSAPP` at the top of `mobile/app/(tabs)/shop.jsx`.
+There is now **one config block per app** (single source of truth) for both the WhatsApp number and the donation UPI IDs:
 
-If left blank, WhatsApp opens a contact picker (the customer chooses who to send to).
+- **Web:** edit `KV_CONFIG` at the top of `app.js` → set `shopWhatsApp: '919812345678'` (country code, no `+`) and the `upi` IDs.
+- **Mobile:** edit `KV_CONFIG` in `mobile/constants/Config.js` → same `shopWhatsApp` and `upi` fields.
 
-> When you're ready for in-app card/UPI payments, the next step is a Razorpay integration + an `orders` collection (already allowed for in the rules). Ask and it can be added.
+If `shopWhatsApp` is left blank, WhatsApp opens a contact picker (the customer chooses who to send to).
+
+> Every order now also writes an `orders` document in Firestore (status `pending`) for signed-in users, and donations log a `donations` intent — so you have a record even before adding a payment gateway. When you're ready for in-app card/UPI payments, the next step is a Razorpay integration on top of the existing `orders` collection.
 
 ---
 

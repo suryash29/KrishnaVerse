@@ -8,10 +8,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { Colors } from '../../constants/Colors';
 import { fetchProducts, formatPrice, SHOP_TABS, TAB_TO_CATEGORY } from '../../constants/Shop';
-
-// 👇 Optional: set your shop WhatsApp number (with country code, no +) to
-// route orders to a specific number, e.g. '919812345678'. Leave '' for picker.
-const SHOP_WHATSAPP = '';
+import { KV_CONFIG } from '../../constants/Config';
+import { createOrder, createDonation } from '../../services/cloud';
+import { useAuth } from '../../context/AuthContext';
 
 const CAUSES = [
   {
@@ -20,7 +19,7 @@ const CAUSES = [
     title: 'Go Seva',
     desc: 'Feed and protect cows at local gaushalas',
     amounts: [51, 101, 251, 501],
-    upi: 'goseva@upi',
+    upi: KV_CONFIG.upi.goseva,
   },
   {
     id: 'gita',
@@ -28,7 +27,7 @@ const CAUSES = [
     title: 'Gita Distribution',
     desc: 'Distribute free Bhagavad Gita to students',
     amounts: [21, 51, 101, 201],
-    upi: 'gitadaan@upi',
+    upi: KV_CONFIG.upi.gita,
   },
   {
     id: 'temple',
@@ -36,11 +35,12 @@ const CAUSES = [
     title: 'Temple Seva',
     desc: 'Support temple prasad and puja activities',
     amounts: [51, 108, 251, 1008],
-    upi: 'templeseva@upi',
+    upi: KV_CONFIG.upi.temple,
   },
 ];
 
 export default function ShopScreen() {
+  const { user } = useAuth();
   const [shopTab, setShopTab] = useState('All');
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -56,18 +56,37 @@ export default function ShopScreen() {
     : products.filter(p => p.category === TAB_TO_CATEGORY[shopTab]);
 
   function handleDonate(cause, amount) {
+    // Best-effort record of the donation intent.
+    createDonation({
+      causeId: cause.id,
+      causeName: cause.title,
+      amount: String(amount),
+      upiId: cause.upi,
+      userId: user ? user.uid : null,
+      status: 'intent',
+    });
     const upiUrl = `upi://pay?pa=${cause.upi}&pn=${encodeURIComponent(cause.title)}&am=${amount}&cu=INR&tn=${encodeURIComponent('KrishnaVerse Donation')}`;
     Linking.openURL(upiUrl).catch(() => {
-      Alert.alert('UPI App Not Found', 'Please update the UPI ID in firebaseConfig.js for real payments.');
+      Alert.alert('UPI App Not Found', 'Please update the UPI ID in constants/Config.js for real payments.');
     });
   }
 
   function handleOrder(product) {
+    // Best-effort record of the order (requires sign-in per security rules).
+    if (user) {
+      createOrder({
+        userId: user.uid,
+        items: [{ id: product.id, name: product.title, price: formatPrice(product.price), category: product.category || null }],
+        status: 'pending',
+        channel: 'whatsapp',
+      });
+    }
     const msg = encodeURIComponent(
       `Hare Krishna 🙏\n\nI would like to order: *${product.title}*\nPrice: ${formatPrice(product.price)}\n\nFrom KrishnaVerse App`
     );
-    const url = SHOP_WHATSAPP
-      ? `whatsapp://send?phone=${SHOP_WHATSAPP}&text=${msg}`
+    const waNum = KV_CONFIG.shopWhatsApp;
+    const url = waNum
+      ? `whatsapp://send?phone=${waNum}&text=${msg}`
       : `whatsapp://send?text=${msg}`;
     Linking.openURL(url).catch(() => {
       Alert.alert('WhatsApp Not Found', 'Install WhatsApp to order via chat.');

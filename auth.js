@@ -10,24 +10,126 @@ import {
   createUserWithEmailAndPassword,
   signOut,
   updateProfile,
+  updatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
   sendPasswordResetEmail,
+  sendEmailVerification,
+  db,
+  doc,
+  getDoc,
+  setDoc,
+  addDoc,
+  collection,
+  serverTimestamp,
 } from './firebase-config.js';
 
+// ── Cloud data sync (Firestore users/{uid}) ─────────────
+// Exposed for the classic app.js (which cannot import modules) to read
+// and persist a signed-in user's personal data across devices.
+window.__kvCloud = {
+  async load(uid) {
+    try {
+      const snap = await getDoc(doc(db, 'users', uid));
+      return snap.exists() ? snap.data() : null;
+    } catch (e) {
+      console.warn('Cloud load failed:', e && e.message);
+      return null;
+    }
+  },
+  async save(uid, data) {
+    try {
+      await setDoc(
+        doc(db, 'users', uid),
+        Object.assign({}, data, { updatedAt: serverTimestamp() }),
+        { merge: true }
+      );
+      return true;
+    } catch (e) {
+      console.warn('Cloud save failed:', e && e.message);
+      return false;
+    }
+  },
+  // Create an order document (used by the storefront checkout).
+  async createOrder(order) {
+    try {
+      const ref = await addDoc(collection(db, 'orders'),
+        Object.assign({}, order, { createdAt: serverTimestamp() }));
+      return ref.id;
+    } catch (e) {
+      console.warn('Order create failed:', e && e.message);
+      return null;
+    }
+  },
+  // Record a donation intent (used by the donate flow).
+  async createDonation(donation) {
+    try {
+      const ref = await addDoc(collection(db, 'donations'),
+        Object.assign({}, donation, { createdAt: serverTimestamp() }));
+      return ref.id;
+    } catch (e) {
+      console.warn('Donation record failed:', e && e.message);
+      return null;
+    }
+  },
+};
+
+// ── Profile actions (exposed to app.js / inline handlers) ───
+window.__kvUpdateName = async function (name) {
+  if (!auth.currentUser) return false;
+  await updateProfile(auth.currentUser, { displayName: name });
+  return true;
+};
+window.__kvSendVerify = async function () {
+  if (!auth.currentUser) return false;
+  await sendEmailVerification(auth.currentUser);
+  return true;
+};
+window.__kvChangePassword = async function (currentPassword, newPassword) {
+  const user = auth.currentUser;
+  if (!user || !user.email) throw new Error('Not signed in.');
+  const cred = EmailAuthProvider.credential(user.email, currentPassword);
+  await reauthenticateWithCredential(user, cred);
+  await updatePassword(user, newPassword);
+  return true;
+};
+
 // ── Auth State Observer ─────────────────────────────────
+// auth.js is the single source of truth for which top-level layer is
+// visible (splash / authOverlay / #app). app.js exposes __kvShowApp()
+// and __kvShowAuth() and never reveals the app on its own timer, which
+// eliminates the previous race where the app flashed for signed-out
+// users and the splash could get stuck for signed-in users.
 onAuthStateChanged(auth, (user) => {
+  window.__kvAuthResolved = true;
   if (user) {
     onUserLoggedIn(user);
   } else {
     onUserLoggedOut();
   }
+}, (error) => {
+  // Network/init error — fail safe to the login screen.
+  window.__kvAuthResolved = true;
+  console.warn('Auth error:', error && error.message);
+  onUserLoggedOut();
 });
 
 function onUserLoggedIn(user) {
-  // Hide auth overlay, show splash then app
-  document.getElementById('authOverlay').classList.add('hidden');
-  const splashEl = document.getElementById('splash');
-  splashEl.classList.remove('hidden');
-  splashEl.style.opacity = '1';
+  // Reveal the app (handles overlay/splash/app visibility + rendering).
+  if (typeof window.__kvShowApp === 'function') {
+    window.__kvShowApp();
+  } else {
+    document.getElementById('authOverlay').classList.add('hidden');
+    const splashEl = document.getElementById('splash');
+    if (splashEl) { splashEl.classList.remove('hidden'); splashEl.style.opacity = '1'; }
+  }
+
+  // Expose the current user + load their cloud-synced data.
+  window.__kvUser = user;
+  if (typeof window.__kvOnLogin === 'function') window.__kvOnLogin(user);
+
+  // Show a gentle reminder if the email is not yet verified.
+  if (user && user.emailVerified === false) showVerifyNotice(user);
 
   // Update header user menu
   const initial = (user.displayName || user.email || 'U')[0].toUpperCase();
@@ -43,6 +145,7 @@ function onUserLoggedIn(user) {
           <small>${user.email}</small>
         </div>
         <hr class="user-dropdown-sep" />
+        <button class="user-dropdown-item" onclick="window._toggleUserDropdown();window.openProfileModal&&window.openProfileModal()">My Profile</button>
         <button class="user-dropdown-item" onclick="window._handleSignOut()">Sign Out</button>
       </div>
     </div>
@@ -56,10 +159,17 @@ function onUserLoggedIn(user) {
 }
 
 function onUserLoggedOut() {
-  // Show auth overlay
-  document.getElementById('authOverlay').classList.remove('hidden');
-  document.getElementById('app').classList.add('hidden');
-  document.getElementById('splash').classList.add('hidden');
+  window.__kvUser = null;
+  if (typeof window.__kvOnLogout === 'function') window.__kvOnLogout();
+
+  // Show auth overlay (and hide splash/app) via the shared hook.
+  if (typeof window.__kvShowAuth === 'function') {
+    window.__kvShowAuth();
+  } else {
+    document.getElementById('authOverlay').classList.remove('hidden');
+    document.getElementById('app').classList.add('hidden');
+    document.getElementById('splash').classList.add('hidden');
+  }
 
   // Clear header user menu
   const headerMenu = document.getElementById('headerUserMenu');
@@ -67,6 +177,30 @@ function onUserLoggedOut() {
 
   // Reset to login screen
   switchAuthScreen('login');
+}
+
+// ── Email verification notice ───────────────────────────
+function showVerifyNotice(user) {
+  // Non-blocking banner offering to resend the verification email.
+  if (document.getElementById('kvVerifyNotice')) return;
+  const bar = document.createElement('div');
+  bar.id = 'kvVerifyNotice';
+  bar.className = 'kv-verify-notice';
+  bar.innerHTML = `
+    <span>📧 Please verify your email (${user.email}) to secure your account.</span>
+    <button id="kvResendVerify" class="kv-verify-btn">Resend</button>
+    <button id="kvDismissVerify" class="kv-verify-x" aria-label="Dismiss">✕</button>
+  `;
+  document.body.appendChild(bar);
+  document.getElementById('kvDismissVerify').onclick = () => bar.remove();
+  document.getElementById('kvResendVerify').onclick = async () => {
+    try {
+      await sendEmailVerification(user);
+      bar.querySelector('span').textContent = '✓ Verification email sent — check your inbox.';
+    } catch {
+      bar.querySelector('span').textContent = 'Could not send right now. Please try again later.';
+    }
+  };
 }
 
 // ── Auth Actions ───────────────────────────────────────
@@ -122,6 +256,8 @@ window.handleRegister = async function () {
   try {
     const cred = await createUserWithEmailAndPassword(auth, email, password);
     await updateProfile(cred.user, { displayName: name });
+    // Send a verification email so the account can be confirmed.
+    try { await sendEmailVerification(cred.user); } catch {}
   } catch (err) {
     showAuthError(errorEl, getErrorMessage(err.code));
     btn.disabled = false;

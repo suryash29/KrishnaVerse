@@ -6,6 +6,23 @@
 
 'use strict';
 
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  ⚙️  CONFIG — EDIT THESE VALUES (single source of truth)      ║
+// ║  • shopWhatsApp: your WhatsApp business number in intl        ║
+// ║    format with no '+' or spaces, e.g. '919812345678'.        ║
+// ║    Leave '' to open WhatsApp without a preset recipient.      ║
+// ║  • upi: the UPI ID for each donation cause.                   ║
+// ╚══════════════════════════════════════════════════════════════╝
+const KV_CONFIG = {
+  shopWhatsApp: '',            // TODO: set your WhatsApp number, e.g. '919812345678'
+  upi: {
+    goseva:  'goseva@upi',     // TODO: set real UPI IDs
+    gita:    'spreadgita@upi',
+    culture: 'dharmamovement@upi',
+  },
+};
+window.KV_CONFIG = KV_CONFIG;
+
 // ── State ──────────────────────────────────────────────────
 const STATE = {
   currentScreen: 'home',
@@ -22,6 +39,7 @@ const STATE = {
   reflectionStep: 0,
   chatHistory: [],
   initialized: false,
+  userId: null,        // Firebase uid when signed in (for cloud sync)
 };
 
 // ── Persistence ────────────────────────────────────────────
@@ -36,7 +54,89 @@ function saveState() {
     streak: STATE.streak,
   };
   try { localStorage.setItem('krishna_guide_v2', JSON.stringify(data)); } catch(e) {}
+  // Mirror to the cloud (debounced) when signed in.
+  scheduleCloudSave();
 }
+
+// ── Cloud sync bridge (Firestore via auth.js module) ───────
+let __kvCloudSaveTimer = null;
+function scheduleCloudSave() {
+  if (!STATE.userId || !window.__kvCloud) return;
+  clearTimeout(__kvCloudSaveTimer);
+  __kvCloudSaveTimer = setTimeout(() => {
+    window.__kvCloud.save(STATE.userId, {
+      language: STATE.language,
+      darkMode: STATE.darkMode,
+      bookmarks: STATE.bookmarks,
+      notes: STATE.notes,
+      journal: STATE.journal,
+      moodHistory: STATE.moodHistory,
+      streak: STATE.streak,
+    });
+  }, 1200);
+}
+
+// Merge cloud data into local STATE without losing local-only entries.
+function mergeCloudIntoState(cloud) {
+  if (!cloud) return;
+  // Bookmarks: union of ids.
+  if (Array.isArray(cloud.bookmarks)) {
+    STATE.bookmarks = Array.from(new Set([...(STATE.bookmarks || []), ...cloud.bookmarks]));
+  }
+  // Notes: cloud values win for shared keys, keep local-only keys.
+  if (cloud.notes && typeof cloud.notes === 'object') {
+    STATE.notes = Object.assign({}, STATE.notes || {}, cloud.notes);
+  }
+  // Journal: union by id.
+  if (Array.isArray(cloud.journal)) {
+    const byId = {};
+    [...(STATE.journal || []), ...cloud.journal].forEach(e => { if (e && e.id != null) byId[e.id] = e; });
+    STATE.journal = Object.values(byId).sort((a, b) => (b.date || 0) - (a.date || 0));
+  }
+  // Mood history: union by date.
+  if (Array.isArray(cloud.moodHistory)) {
+    const byDate = {};
+    [...(STATE.moodHistory || []), ...cloud.moodHistory].forEach(m => { if (m && m.date) byDate[m.date] = m; });
+    STATE.moodHistory = Object.values(byDate);
+  }
+  // Streak: keep the strongest record.
+  if (cloud.streak && typeof cloud.streak === 'object') {
+    const local = STATE.streak || { current: 0, best: 0, lastDate: null };
+    STATE.streak = {
+      current: Math.max(local.current || 0, cloud.streak.current || 0),
+      best: Math.max(local.best || 0, cloud.streak.best || 0),
+      lastDate: (cloud.streak.lastDate && local.lastDate)
+        ? (cloud.streak.lastDate > local.lastDate ? cloud.streak.lastDate : local.lastDate)
+        : (cloud.streak.lastDate || local.lastDate),
+    };
+  }
+  if (typeof cloud.darkMode === 'boolean') STATE.darkMode = cloud.darkMode;
+  if (cloud.language) STATE.language = cloud.language;
+}
+
+// Called by auth.js when a user signs in.
+window.__kvOnLogin = async function (user) {
+  STATE.userId = user.uid;
+  if (!window.__kvCloud) return;
+  const cloud = await window.__kvCloud.load(user.uid);
+  if (cloud) {
+    mergeCloudIntoState(cloud);
+    applyTheme();
+    updateLangLabel();
+    try { localStorage.setItem('krishna_guide_v2', JSON.stringify({
+      language: STATE.language, darkMode: STATE.darkMode, bookmarks: STATE.bookmarks,
+      notes: STATE.notes, journal: STATE.journal, moodHistory: STATE.moodHistory, streak: STATE.streak,
+    })); } catch (e) {}
+    if (STATE.initialized) { renderHome(); renderReflect(); renderSaved(); }
+  }
+  // Push the (merged or first-time) state up to the cloud.
+  scheduleCloudSave();
+};
+
+// Called by auth.js when the user signs out.
+window.__kvOnLogout = function () {
+  STATE.userId = null;
+};
 
 function loadState() {
   try {
@@ -54,31 +154,90 @@ function loadState() {
 }
 
 // ── Boot ────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
+// First principles: the UI has three mutually-exclusive layers —
+// splash (loading), authOverlay (signed-out), and #app (signed-in).
+// Exactly one should be visible at a time, and ONLY Firebase auth
+// state may decide between authOverlay and #app. app.js therefore
+// never reveals #app on a timer; it only prepares data + renders,
+// and exposes reveal hooks that auth.js calls once auth resolves.
+
+let __kvPrepped = false;
+function __kvPrep() {
+  if (__kvPrepped) return;
+  __kvPrepped = true;
   loadState();
   applyTheme();
   updateLangLabel();
   updateStreakForToday();
+}
 
+let __kvRendered = false;
+function __kvRenderAll() {
+  if (__kvRendered) return;
+  __kvRendered = true;
+  STATE.initialized = true;
+  renderHome();
+  renderExplore();
+  renderReflect();
+  renderSaved();
+}
+
+// Called by auth.js when a signed-in user is confirmed.
+window.__kvShowApp = function () {
+  __kvPrep();
+  __kvRenderAll();
+  const splash = document.getElementById('splash');
+  const app = document.getElementById('app');
+  const overlay = document.getElementById('authOverlay');
+  if (overlay) overlay.classList.add('hidden');
+  if (!splash || !app) return;
+  splash.style.transition = 'opacity 0.5s ease';
+  splash.style.opacity = '0';
   setTimeout(() => {
-    document.getElementById('splash').style.opacity = '0';
-    document.getElementById('splash').style.transition = 'opacity 0.5s ease';
-    setTimeout(() => {
-      document.getElementById('splash').classList.add('hidden');
-      document.getElementById('app').classList.remove('hidden');
-      document.getElementById('app').style.animation = 'splash-in 0.4s ease forwards';
-      STATE.initialized = true;
-      renderHome();
-      renderExplore();
-      renderReflect();
-      renderSaved();
-    }, 500);
-  }, 2000);
+    splash.classList.add('hidden');
+    app.classList.remove('hidden');
+    app.style.animation = 'splash-in 0.4s ease forwards';
+  }, 500);
+};
+
+// Called by auth.js when there is no signed-in user.
+window.__kvShowAuth = function () {
+  const splash = document.getElementById('splash');
+  const app = document.getElementById('app');
+  const overlay = document.getElementById('authOverlay');
+  if (app) app.classList.add('hidden');
+  if (splash) { splash.style.opacity = '0'; splash.classList.add('hidden'); }
+  if (overlay) overlay.classList.remove('hidden');
+  if (typeof window.switchAuthScreen === 'function') window.switchAuthScreen('login');
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  __kvPrep();
+
+  // Show the splash as a loading screen while Firebase auth resolves —
+  // but only if auth hasn't already resolved (and possibly revealed the
+  // app) before this handler ran.
+  if (!window.__kvAuthResolved) {
+    const splash = document.getElementById('splash');
+    if (splash) { splash.classList.remove('hidden'); splash.style.opacity = '1'; }
+  }
+
+  // Fallback: if the auth module never initialises (e.g. the page was
+  // opened directly from the filesystem, where ES modules + Firebase
+  // cannot run), there is no auth state to wait for. After a grace
+  // period, surface the login screen so the user is never stuck on the
+  // splash forever.
+  setTimeout(() => {
+    if (!window.__kvAuthResolved) window.__kvShowAuth();
+  }, 10000);
 
   // Enter key for chat
-  document.getElementById('chatInput').addEventListener('keydown', e => {
-    if (e.key === 'Enter') sendMessage();
-  });
+  const chatInput = document.getElementById('chatInput');
+  if (chatInput) {
+    chatInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') sendMessage();
+    });
+  }
 
   // Register service worker
   if ('serviceWorker' in navigator) {
@@ -1229,7 +1388,7 @@ const DONATION_CAUSES = [
     goal: '₹5,00,000',
     percent: 43,
     color: '#4CAF50',
-    upiId: 'goseva@upi',
+    upiId: KV_CONFIG.upi.goseva,
     impact: '₹51 feeds a cow for one day · ₹501 sponsors a week of care',
   },
   {
@@ -1242,7 +1401,7 @@ const DONATION_CAUSES = [
     goal: '₹2,00,000',
     percent: 44,
     color: '#FF9800',
-    upiId: 'spreadgita@upi',
+    upiId: KV_CONFIG.upi.gita,
     impact: '₹101 gifts one Gita · ₹1001 reaches 10 lives',
   },
   {
@@ -1255,7 +1414,7 @@ const DONATION_CAUSES = [
     goal: '₹3,00,000',
     percent: 48,
     color: '#E8690A',
-    upiId: 'dharmamovement@upi',
+    upiId: KV_CONFIG.upi.culture,
     impact: '₹251 sponsors a satsang · ₹1001 funds a community Gita class',
   },
 ];
@@ -1429,8 +1588,21 @@ function proceedDonate(causeId) {
   const custom = document.getElementById('dmCustomAmt');
   const amount = selectedDonateAmount || (custom && custom.value ? '₹' + custom.value.replace(/[₹,]/g, '') : null);
   if (!amount) { showToast('Please select or enter an amount'); return; }
+  // Best-effort record of the donation intent.
+  if (window.__kvCloud && typeof window.__kvCloud.createDonation === 'function') {
+    window.__kvCloud.createDonation({
+      causeId: cause.id,
+      causeName: cause.name,
+      amount: String(amount),
+      upiId: cause.upiId,
+      userId: STATE.userId || null,
+      status: 'intent',
+    });
+  }
+  const waNum = (KV_CONFIG && KV_CONFIG.shopWhatsApp) ? KV_CONFIG.shopWhatsApp : '';
+  const waBase = waNum ? `https://wa.me/${waNum}` : `https://wa.me/`;
   const msg = encodeURIComponent(`Jai Shri Krishna! 🙏\n\nI want to donate ${amount} to *${cause.name}* – ${cause.subtitle}.\n\nUPI: ${cause.upiId}\n\nHare Krishna 🪔`);
-  window.open(`https://wa.me/?text=${msg}`, '_blank');
+  window.open(`${waBase}?text=${msg}`, '_blank', 'noopener');
   showToast('Jai Shri Krishna! Opening WhatsApp...');
 }
 
@@ -1445,9 +1617,9 @@ function openProductModal(productId) {
   const p = _shopProducts().find(x => x.id === productId);
   if (!p) return;
   const priceStr = _shopPrice(p.price);
-  // SHOP_WHATSAPP can be set (e.g. '919812345678') to route orders to your number
-  const waBase = (typeof window.SHOP_WHATSAPP === 'string' && window.SHOP_WHATSAPP)
-    ? `https://wa.me/${window.SHOP_WHATSAPP}` : `https://wa.me/`;
+  // Order routing number comes from the single KV_CONFIG block at the top.
+  const waNum = (KV_CONFIG && KV_CONFIG.shopWhatsApp) ? KV_CONFIG.shopWhatsApp : '';
+  const waBase = waNum ? `https://wa.me/${waNum}` : `https://wa.me/`;
   const msg = encodeURIComponent(`Jai Shri Krishna! 🙏\n\nI want to order:\n\n*${p.name}*\nPrice: ${priceStr}\n\n${p.desc}\n\nPlease confirm availability and delivery details.\n\nHare Krishna 🪔`);
   const waLink = `${waBase}?text=${msg}`;
   const media = p.imageUrl
@@ -1460,16 +1632,138 @@ function openProductModal(productId) {
     <div class="pm-desc">${p.desc}</div>
     <div class="pm-divider"></div>
     <div class="pm-note">All products are carefully sourced from trusted artisans & publishers. Order via WhatsApp and our team will assist you with delivery.</div>
-    <a class="pm-wa-btn" href="${waLink}" target="_blank" rel="noopener">
+    <button class="pm-wa-btn" type="button" onclick="placeOrder('${p.id}', '${waLink.replace(/'/g, "\\'")}')">
       <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
       Order via WhatsApp
-    </a>
+    </button>
   `;
   document.getElementById('productModal').classList.remove('hidden');
 }
+
+// Record the order in Firestore (best-effort) then open WhatsApp.
+function placeOrder(productId, waLink) {
+  const p = _shopProducts().find(x => x.id === productId);
+  if (p && STATE.userId && window.__kvCloud && typeof window.__kvCloud.createOrder === 'function') {
+    window.__kvCloud.createOrder({
+      userId: STATE.userId,
+      items: [{ id: p.id, name: p.name, price: _shopPrice(p.price), category: p.category || null }],
+      status: 'pending',
+      channel: 'whatsapp',
+    });
+  }
+  if (waLink) window.open(waLink, '_blank', 'noopener');
+}
+window.placeOrder = placeOrder;
 
 function closeProductModal(e) {
   if (!e || e.target === document.getElementById('productModal')) {
     document.getElementById('productModal').classList.add('hidden');
   }
 }
+
+// ── Profile / Account Modal ──
+function openProfileModal() {
+  const user = window.__kvUser;
+  if (!user) { showToast('Please sign in first'); return; }
+  const initial = (user.displayName || user.email || 'U')[0].toUpperCase();
+  const verified = user.emailVerified;
+  const bookmarks = (STATE.bookmarks || []).length;
+  const entries = (STATE.journal || []).length;
+  const streak = (STATE.streak && STATE.streak.current) || 0;
+  document.getElementById('profileModalBody').innerHTML = `
+    <div class="pf-head">
+      <div class="pf-avatar">${initial}</div>
+      <div class="pf-id">
+        <div class="pf-name-line">${user.displayName || 'Devotee'}</div>
+        <div class="pf-email-line">${user.email}
+          <span class="pf-badge ${verified ? 'ok' : 'warn'}">${verified ? '✓ Verified' : 'Unverified'}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="pf-stats">
+      <div class="pf-stat"><span class="pf-stat-num">${bookmarks}</span><span class="pf-stat-lbl">Saved</span></div>
+      <div class="pf-stat"><span class="pf-stat-num">${entries}</span><span class="pf-stat-lbl">Journal</span></div>
+      <div class="pf-stat"><span class="pf-stat-num">${streak}</span><span class="pf-stat-lbl">Day Streak</span></div>
+    </div>
+
+    <div class="pf-section">
+      <label class="pf-label">Display Name</label>
+      <div class="pf-row">
+        <input type="text" id="pfName" class="pf-input" value="${(user.displayName || '').replace(/"/g, '&quot;')}" />
+        <button class="pf-btn" onclick="saveProfileName()">Save</button>
+      </div>
+    </div>
+
+    ${verified ? '' : `
+    <div class="pf-section">
+      <button class="pf-btn pf-btn-outline" onclick="resendVerify()">📧 Resend verification email</button>
+    </div>`}
+
+    <div class="pf-section">
+      <label class="pf-label">Change Password</label>
+      <input type="password" id="pfCurrent" class="pf-input pf-input-block" placeholder="Current password" autocomplete="current-password" />
+      <input type="password" id="pfNew" class="pf-input pf-input-block" placeholder="New password (min 6 chars)" autocomplete="new-password" />
+      <button class="pf-btn pf-btn-block" onclick="changeProfilePassword()">Update Password</button>
+    </div>
+
+    <div id="pfMsg" class="pf-msg hidden"></div>
+
+    <button class="pf-signout" onclick="window._handleSignOut()">Sign Out</button>
+  `;
+  document.getElementById('profileModal').classList.remove('hidden');
+}
+window.openProfileModal = openProfileModal;
+
+function closeProfileModal(e) {
+  if (!e || e.target === document.getElementById('profileModal')) {
+    document.getElementById('profileModal').classList.add('hidden');
+  }
+}
+window.closeProfileModal = closeProfileModal;
+
+function _pfMsg(text, ok) {
+  const el = document.getElementById('pfMsg');
+  if (!el) return;
+  el.textContent = text;
+  el.classList.remove('hidden');
+  el.style.color = ok ? '#2D8A4E' : '#C0392B';
+}
+
+async function saveProfileName() {
+  const name = (document.getElementById('pfName').value || '').trim();
+  if (!name) { _pfMsg('Name cannot be empty.', false); return; }
+  try {
+    await window.__kvUpdateName(name);
+    _pfMsg('✓ Name updated.', true);
+    const greetEl = document.querySelector('.greeting-name');
+    if (greetEl) greetEl.textContent = `Jai Shri Krishna, ${name.split(' ')[0]} 🙏`;
+  } catch (e) {
+    _pfMsg('Could not update name. Please try again.', false);
+  }
+}
+window.saveProfileName = saveProfileName;
+
+async function resendVerify() {
+  try { await window.__kvSendVerify(); _pfMsg('✓ Verification email sent.', true); }
+  catch { _pfMsg('Could not send right now. Try later.', false); }
+}
+window.resendVerify = resendVerify;
+
+async function changeProfilePassword() {
+  const cur = document.getElementById('pfCurrent').value;
+  const nw = document.getElementById('pfNew').value;
+  if (!cur || !nw) { _pfMsg('Enter both current and new password.', false); return; }
+  if (nw.length < 6) { _pfMsg('New password must be at least 6 characters.', false); return; }
+  try {
+    await window.__kvChangePassword(cur, nw);
+    _pfMsg('✓ Password updated.', true);
+    document.getElementById('pfCurrent').value = '';
+    document.getElementById('pfNew').value = '';
+  } catch (e) {
+    const code = e && e.code;
+    _pfMsg(code === 'auth/wrong-password' || code === 'auth/invalid-credential'
+      ? 'Current password is incorrect.' : 'Could not update password. Please try again.', false);
+  }
+}
+window.changeProfilePassword = changeProfilePassword;

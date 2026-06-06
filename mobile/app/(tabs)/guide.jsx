@@ -85,7 +85,9 @@ export default function GuideScreen() {
                 </TouchableOpacity>
               </View>
               <Text style={styles.shlokaText}>{s.english}</Text>
-              <Text style={styles.shlokaApp}>{s.lifeApplication}</Text>
+              {!!s.lifeApplication && (
+                <Text style={styles.shlokaApp}>{s.lifeApplication}</Text>
+              )}
             </View>
           ))}
         </View>

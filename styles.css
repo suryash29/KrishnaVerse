@@ -1543,3 +1543,85 @@ svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; 
   font-weight: 600;
 }
 .user-dropdown-item:hover { background: #FDECEA; }
+
+/* ── Email verification notice ───────────────────────────── */
+.kv-verify-notice {
+  position: fixed;
+  left: 50%;
+  bottom: 84px;
+  transform: translateX(-50%);
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 92%;
+  background: #FFF3E0;
+  color: #7A4A00;
+  border: 1px solid #FFCC80;
+  padding: 10px 14px;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  font-size: 13px;
+}
+.kv-verify-btn {
+  background: #E8690A;
+  color: #fff;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.kv-verify-x {
+  background: transparent;
+  border: none;
+  color: #7A4A00;
+  font-size: 15px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+/* ── Profile modal ───────────────────────────────────────── */
+.profile-modal-card { max-width: 460px; }
+.pf-head { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+.pf-avatar {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: linear-gradient(135deg, #E8690A, #FFB300);
+  color: #fff; font-size: 24px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  flex: 0 0 auto;
+}
+.pf-name-line { font-size: 18px; font-weight: 700; }
+.pf-email-line { font-size: 13px; opacity: 0.8; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pf-badge { font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+.pf-badge.ok { background: #E8F5E9; color: #2D8A4E; }
+.pf-badge.warn { background: #FDECEA; color: #C0392B; }
+.pf-stats { display: flex; gap: 10px; margin-bottom: 18px; }
+.pf-stat {
+  flex: 1; text-align: center; background: rgba(232,105,10,0.08);
+  border-radius: 12px; padding: 10px 6px;
+}
+.pf-stat-num { display: block; font-size: 20px; font-weight: 700; color: #E8690A; }
+.pf-stat-lbl { font-size: 11px; opacity: 0.75; }
+.pf-section { margin-bottom: 16px; }
+.pf-label { display: block; font-size: 12px; font-weight: 600; opacity: 0.8; margin-bottom: 6px; }
+.pf-row { display: flex; gap: 8px; }
+.pf-input {
+  flex: 1; padding: 10px 12px; border: 1px solid rgba(0,0,0,0.15);
+  border-radius: 10px; font-size: 14px; background: var(--input-bg, #fff); color: inherit;
+}
+.pf-input-block { width: 100%; display: block; margin-bottom: 8px; }
+.pf-btn {
+  background: #E8690A; color: #fff; border: none; padding: 10px 16px;
+  border-radius: 10px; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.pf-btn-block { width: 100%; }
+.pf-btn-outline { background: transparent; color: #E8690A; border: 1px solid #E8690A; width: 100%; }
+.pf-msg { font-size: 13px; margin: 10px 0; text-align: center; }
+.pf-signout {
+  width: 100%; margin-top: 8px; background: transparent;
+  color: #C0392B; border: 1px solid #C0392B; padding: 10px;
+  border-radius: 10px; font-weight: 600; cursor: pointer;
+}
+body.dark-mode .pf-input { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.2); }
+body.dark-mode .kv-verify-notice { background: #3a2c10; color: #FFD79A; border-color: #6b5320; }
