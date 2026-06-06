@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import * as Speech from 'expo-speech';
-import { Audio } from 'expo-av';
+import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { Colors } from '../constants/Colors';
 import { CHAPTER_AUDIO } from '../constants/Config';
 import { useApp } from '../context/AppContext';
@@ -26,7 +26,7 @@ export default function VerseAudio({ shloka, onUpgrade }) {
   useEffect(() => {
     return () => {
       Speech.stop();
-      if (soundRef.current) { soundRef.current.unloadAsync().catch(() => {}); soundRef.current = null; }
+      if (soundRef.current) { try { soundRef.current.remove(); } catch (e) {} soundRef.current = null; }
     };
   }, [shloka && shloka.id]);
 
@@ -50,20 +50,22 @@ export default function VerseAudio({ shloka, onUpgrade }) {
 
   async function toggleChapter() {
     try {
+      // Already created: just toggle play/pause (expo-audio uses synchronous
+      // properties + methods instead of expo-av's async status calls).
       if (soundRef.current) {
-        const status = await soundRef.current.getStatusAsync();
-        if (status.isLoaded && status.isPlaying) { await soundRef.current.pauseAsync(); setPlaying(false); return; }
-        if (status.isLoaded) { await soundRef.current.playAsync(); setPlaying(true); return; }
+        if (soundRef.current.playing) { soundRef.current.pause(); setPlaying(false); return; }
+        soundRef.current.play(); setPlaying(true); return;
       }
       setLoading(true);
-      await Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: false });
-      const { sound } = await Audio.Sound.createAsync({ uri: chapterUrl }, { shouldPlay: true });
-      soundRef.current = sound;
-      sound.setOnPlaybackStatusUpdate((s) => {
-        if (!s.isLoaded) return;
-        setPlaying(s.isPlaying);
+      await setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: false });
+      const player = createAudioPlayer({ uri: chapterUrl });
+      soundRef.current = player;
+      player.addListener('playbackStatusUpdate', (s) => {
+        if (!s || !s.isLoaded) return;
+        setPlaying(!!s.playing);
         if (s.didJustFinish) setPlaying(false);
       });
+      player.play();
       setPlaying(true);
     } catch (e) {
       setPlaying(false);
