@@ -134,17 +134,16 @@ async function main() {
       (t) => t.type === 'blob' && /verse_recitation\/.+\.(mp3|ogg|m4a)$/i.test(t.path)
     );
     for (const f of files) {
-      // Expect names like data/verse_recitation/<n>.mp3 where <n> is the global
-      // verse id (1..701). Map by id field when available, else by filename num.
-      const m = f.path.match(/verse_recitation\/(.+)\.(mp3|ogg|m4a)$/i);
+      // Files are organised as verse_recitation/<chapter>/<verse>.<ext>.
+      // Read chapter + verse straight from the PATH — never collapse the
+      // digits (e.g. "1/12" and "11/2" must NOT both become "112").
+      const m = f.path.match(/verse_recitation\/(\d+)\/(\d+)\.(mp3|ogg|m4a)$/i);
       if (!m) continue;
-      const base = m[1];
-      const num = parseInt(base.replace(/[^0-9]/g, ''), 10);
-      if (!Number.isFinite(num)) continue;
-      const verse = verses.find((v) => Number(v.id) === num);
-      if (!verse) continue;
-      const id = `BG_${verse[chKey]}_${verse[vKey]}`;
-      verseAudio[id] = `${RAW}/verse_recitation/${base}.${m[2]}`;
+      const ch = parseInt(m[1], 10);
+      const vn = parseInt(m[2], 10);
+      if (!Number.isFinite(ch) || !Number.isFinite(vn)) continue;
+      const id = `BG_${ch}_${vn}`;
+      verseAudio[id] = `${RAW}/verse_recitation/${ch}/${vn}.${m[3]}`;
     }
     console.log(`  ✓ Mapped recitation audio for ${Object.keys(verseAudio).length} verses.`);
   } catch (e) {
