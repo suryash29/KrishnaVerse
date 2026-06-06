@@ -131,7 +131,7 @@ export default function VerseAudio({ shloka, onUpgrade }) {
             <Text style={styles.lockSub}>{hiFirst
               ? 'शुद्ध संस्कृत उच्चारण में पूरे अध्याय का पाठ।'
               : 'Full-chapter chanting in pure Sanskrit pronunciation.'}</Text>
-            <Text style={styles.lockCta}>{hiFirst ? 'प्रीमियम लें · ₹199/वर्ष →' : 'Go Premium · ₹199/year →'}</Text>
+            <Text style={styles.lockCta}>{hiFirst ? 'प्रीमियम लें · ₹399/वर्ष →' : 'Go Premium · ₹399/year →'}</Text>
           </View>
         </TouchableOpacity>
       )}

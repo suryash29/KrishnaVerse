@@ -285,10 +285,14 @@ export default function ReflectScreen() {
         </View>
       </ScrollView>
 
-      {activeTab === 'Reflect' && <ReflectTab />}
-      {activeTab === 'Bookmarks' && <BookmarksTab />}
-      {activeTab === 'Notes' && <NotesTab />}
-      {activeTab === 'Progress' && <ProgressTab />}
+      {/* flex:1 wrapper so the active tab's ScrollView fills the remaining
+          height instead of collapsing — which was squeezing the top tile. */}
+      <View style={styles.tabContentArea}>
+        {activeTab === 'Reflect' && <ReflectTab />}
+        {activeTab === 'Bookmarks' && <BookmarksTab />}
+        {activeTab === 'Notes' && <NotesTab />}
+        {activeTab === 'Progress' && <ProgressTab />}
+      </View>
 
       {/* Journal Modal */}
       <Modal
@@ -359,7 +363,8 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     marginTop: 2,
   },
-  tabBarScroll: { maxHeight: 52, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  tabBarScroll: { flexGrow: 0, flexShrink: 0, maxHeight: 52, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  tabContentArea: { flex: 1 },
   tabBar: {
     flexDirection: 'row',
     paddingHorizontal: 16,

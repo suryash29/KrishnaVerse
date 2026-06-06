@@ -944,6 +944,23 @@ svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; 
 .pr-title { font-size: 20px; font-weight: 800; color: var(--text-primary); margin-bottom: 4px; }
 .pr-price { font-size: 32px; font-weight: 800; color: var(--gold-light); margin-bottom: 14px; }
 .pr-price span { font-size: 15px; font-weight: 500; color: var(--text-muted); }
+.pr-price-alt { font-size: 12px; font-weight: 600; color: var(--text-muted); margin: -8px 0 14px; }
+.pr-plans { display: flex; gap: 10px; margin: 14px 0 12px; }
+.pr-plan {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 12px 8px; border-radius: 14px; border: 1.5px solid var(--border);
+  background: var(--card, #fff); cursor: pointer; transition: border-color .15s, background .15s;
+}
+.pr-plan:hover { border-color: var(--primary, #E8690A); }
+.pr-plan.active { border-color: var(--primary, #E8690A); background: rgba(232,105,10,0.08); }
+.pr-plan-name { font-size: 13px; font-weight: 700; color: var(--text-secondary); }
+.pr-plan.active .pr-plan-name { color: var(--primary, #E8690A); }
+.pr-plan-price { font-size: 18px; font-weight: 800; color: var(--text); }
+.pr-plan.active .pr-plan-price { color: var(--primary, #E8690A); }
+.pr-plan-price small { font-size: 12px; font-weight: 500; color: var(--text-muted); }
+.pr-plan-sub { font-size: 10px; font-weight: 600; color: var(--text-muted); text-align: center; }
+.ad-slot { margin: 16px 0 4px; min-height: 0; overflow: hidden; }
+.ad-slot[hidden] { display: none; }
 .pr-benefits { list-style: none; padding: 0; margin: 0 0 16px; text-align: left; }
 .pr-benefits li { font-size: 14px; color: var(--text-secondary); padding: 7px 0; border-bottom: 1px solid var(--border); }
 .pr-benefits li:last-child { border-bottom: none; }

@@ -148,6 +148,8 @@
               <span class="qa-label">Saved</span>
               <span class="qa-desc">Bookmarks</span>
             </button>
+            <!-- Shop on hold: GoSeva + Spiritual Shop quick-actions hidden.
+                 Files/markup kept intact; un-comment to restore.
             <button class="quick-action-card" onclick="navigateTo('shop')">
               <span class="qa-icon">🐄</span>
               <span class="qa-label">GoSeva</span>
@@ -158,6 +160,7 @@
               <span class="qa-label">Spiritual Shop</span>
               <span class="qa-desc">Books & Puja</span>
             </button>
+            -->
           </div>
 
           <!-- Situation Wisdom -->
@@ -174,6 +177,10 @@
             </div>
             <div class="achievements-row" id="achievementsRow"></div>
           </div>
+
+          <!-- AdSense slot — populated by refreshAds() only for non-premium
+               users when a publisher ID is configured. Premium = ad-free. -->
+          <div class="ad-slot" id="adSlotHome" hidden></div>
 
           <div class="bottom-spacer"></div>
         </div>
@@ -410,10 +417,12 @@
         <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
         <span>My Space</span>
       </button>
+      <!-- Shop on hold: nav button hidden (markup kept; un-comment to restore).
       <button class="nav-btn" id="nav-shop" onclick="navigateTo('shop')">
         <svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
         <span>Shop</span>
       </button>
+      -->
     </nav>
 
   </div><!-- end #app -->

@@ -24,6 +24,20 @@ export async function createPremiumPaymentLink() {
   }
 }
 
+// Monthly auto-debit — ask the server to create a Razorpay Subscription and
+// return its hosted authorisation URL { url, id }. The webhook grants premium
+// once the UPI AutoPay mandate is active and each ₹49 charge succeeds.
+export async function createPremiumSubscription() {
+  try {
+    const fn = httpsCallable(functions, 'createRazorpaySubscription');
+    const res = await fn({});
+    return res && res.data ? res.data : null;
+  } catch (e) {
+    console.warn('Subscription create failed:', e && e.message);
+    return null;
+  }
+}
+
 export async function loadUserData(uid) {
   try {
     const snap = await getDoc(doc(db, 'users', uid));

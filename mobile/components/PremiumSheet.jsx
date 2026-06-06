@@ -7,11 +7,11 @@ import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Gradients } from '../constants/Colors';
 import { KV_CONFIG } from '../constants/Config';
-import { createOrder, createPremiumPaymentLink } from '../services/cloud';
+import { createOrder, createPremiumPaymentLink, createPremiumSubscription } from '../services/cloud';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 
-// KrishnaVerse Premium (₹199/yr) — unlocks word-by-word for all 700 verses.
+// KrishnaVerse Premium (₹399/yr) — unlocks word-by-word for all 700 verses.
 // First principles: the paid value is authentic word-by-word meaning across the
 // whole Gita (the 23 curated verses are free). Payment is out-of-band via
 // UPI/WhatsApp; we record intent and let the cloud entitlement be the source of
@@ -21,11 +21,19 @@ export default function PremiumSheet({ visible, onClose }) {
   const { user } = useAuth();
   const hiFirst = language === 'hi';
 
-  const price = (KV_CONFIG && KV_CONFIG.premiumPrice) ? KV_CONFIG.premiumPrice : 199;
+  const priceYear = (KV_CONFIG && KV_CONFIG.premiumPriceYear) ? KV_CONFIG.premiumPriceYear : 399;
+  const priceMonth = (KV_CONFIG && KV_CONFIG.premiumPriceMonth) ? KV_CONFIG.premiumPriceMonth : 49;
   const upi = (KV_CONFIG && KV_CONFIG.premiumUpi) ? KV_CONFIG.premiumUpi : '';
   const waNum = (KV_CONFIG && KV_CONFIG.shopWhatsApp) ? KV_CONFIG.shopWhatsApp : '';
 
   const [rzpLoading, setRzpLoading] = useState(false);
+  // Plan choice: 'annual' (one-time order — works today) or 'monthly'.
+  // Monthly is charged as a one-time UPI payment for the current month until
+  // Razorpay Subscriptions (auto-recurring) is wired up server-side.
+  const [plan, setPlan] = useState('annual');
+  const isAnnual = plan === 'annual';
+  const price = isAnnual ? priceYear : priceMonth;
+  const periodLabel = isAnnual ? (hiFirst ? 'वर्ष' : 'year') : (hiFirst ? 'माह' : 'month');
 
   const benefits = hiFirst
     ? ['सभी 700 श्लोकों का शब्द-दर-शब्द अर्थ', 'हिंदी + अंग्रेज़ी, दोनों भाषाओं में', 'भविष्य के सभी अपडेट शामिल', 'गौ-सेवा व गीता प्रचार में योगदान']
@@ -35,7 +43,12 @@ export default function PremiumSheet({ visible, onClose }) {
     if (user) {
       createOrder({
         userId: user.uid,
-        items: [{ id: 'premium-annual', name: 'KrishnaVerse Premium (Annual)', price: '₹' + price, category: 'subscription' }],
+        items: [{
+          id: isAnnual ? 'premium-annual' : 'premium-monthly',
+          name: isAnnual ? 'KrishnaVerse Premium (Annual)' : 'KrishnaVerse Premium (Monthly)',
+          price: '₹' + price,
+          category: 'subscription',
+        }],
         status: 'pending',
         channel: 'whatsapp',
       });
@@ -57,7 +70,11 @@ export default function PremiumSheet({ visible, onClose }) {
     if (rzpLoading) return;
     setRzpLoading(true);
     try {
-      const data = await createPremiumPaymentLink();
+      // Monthly → Razorpay Subscription (UPI AutoPay mandate, auto-debits ₹49/mo).
+      // Annual → one-time UPI payment link.
+      const data = isAnnual
+        ? await createPremiumPaymentLink()
+        : await createPremiumSubscription();
       if (data && data.url) {
         await Linking.openURL(data.url);
       } else {
@@ -86,7 +103,7 @@ export default function PremiumSheet({ visible, onClose }) {
   function payWhatsApp() {
     recordIntent();
     const msg = encodeURIComponent(
-      `Jai Shri Krishna! 🙏\n\nI want *KrishnaVerse Premium* (word-by-word for all 700 verses) for ₹${price}/year.${upi ? `\n\nUPI: ${upi}` : ''}\n\nHare Krishna 🪔`
+      `Jai Shri Krishna! 🙏\n\nI want *KrishnaVerse Premium* (word-by-word for all 700 verses) for ₹${price}/${isAnnual ? 'year' : 'month'}.${upi ? `\n\nUPI: ${upi}` : ''}\n\nHare Krishna 🪔`
     );
     const url = waNum ? `whatsapp://send?phone=${waNum}&text=${msg}` : `whatsapp://send?text=${msg}`;
     Linking.openURL(url).catch(() => {
@@ -130,7 +147,43 @@ export default function PremiumSheet({ visible, onClose }) {
             </TouchableOpacity>
             <Text style={styles.crown}>🪔</Text>
             <Text style={styles.title}>{hiFirst ? 'KrishnaVerse प्रीमियम' : 'KrishnaVerse Premium'}</Text>
-            <Text style={styles.price}>₹{price}<Text style={styles.per}>/{hiFirst ? 'वर्ष' : 'year'}</Text></Text>
+
+            {/* Plan chooser — Annual (best value) vs Monthly */}
+            <View style={styles.planRow}>
+              <TouchableOpacity
+                activeOpacity={0.9}
+                style={[styles.planChip, isAnnual && styles.planChipActive]}
+                onPress={() => setPlan('annual')}
+              >
+                <Text style={[styles.planChipTitle, isAnnual && styles.planChipTitleActive]}>
+                  {hiFirst ? 'वार्षिक' : 'Annual'}
+                </Text>
+                <Text style={[styles.planChipPrice, isAnnual && styles.planChipPriceActive]}>
+                  ₹{priceYear}<Text style={styles.planChipPer}>/{hiFirst ? 'वर्ष' : 'yr'}</Text>
+                </Text>
+                <Text style={[styles.planChipSave, isAnnual && styles.planChipSaveActive]}>
+                  {hiFirst ? `₹${Math.round(priceYear / 12)}/माह` : `₹${Math.round(priceYear / 12)}/mo · save ${Math.max(0, Math.round((1 - priceYear / (priceMonth * 12)) * 100))}%`}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.9}
+                style={[styles.planChip, !isAnnual && styles.planChipActive]}
+                onPress={() => setPlan('monthly')}
+              >
+                <Text style={[styles.planChipTitle, !isAnnual && styles.planChipTitleActive]}>
+                  {hiFirst ? 'मासिक' : 'Monthly'}
+                </Text>
+                <Text style={[styles.planChipPrice, !isAnnual && styles.planChipPriceActive]}>
+                  ₹{priceMonth}<Text style={styles.planChipPer}>/{hiFirst ? 'माह' : 'mo'}</Text>
+                </Text>
+                <Text style={[styles.planChipSave, !isAnnual && styles.planChipSaveActive]}>
+                  {hiFirst ? 'हर माह नवीनीकरण' : 'renews monthly'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.price}>₹{price}<Text style={styles.per}>/{periodLabel}</Text></Text>
 
             <View style={styles.benefits}>
               {benefits.map((b, i) => (
@@ -153,7 +206,9 @@ export default function PremiumSheet({ visible, onClose }) {
                   {rzpLoading ? (
                     <ActivityIndicator color="#fff" />
                   ) : (
-                    <Text style={styles.ctaTxt}>{hiFirst ? `UPI से ₹${price} भुगतान करें` : `Pay ₹${price} via UPI`}</Text>
+                    <Text style={styles.ctaTxt}>{isAnnual
+                      ? (hiFirst ? `UPI से ₹${price} भुगतान करें` : `Pay ₹${price} via UPI`)
+                      : (hiFirst ? `UPI AutoPay · ₹${price}/माह` : `Subscribe ₹${price}/mo · AutoPay`)}</Text>
                   )}
                 </LinearGradient>
               </TouchableOpacity>
@@ -184,6 +239,11 @@ export default function PremiumSheet({ visible, onClose }) {
             <Text style={styles.note}>{hiFirst
               ? 'भुगतान की पुष्टि के बाद आपका खाता अनलॉक हो जाएगा। 🙏'
               : 'Your account is unlocked once payment is confirmed. 🙏'}</Text>
+            {!isAnnual && (
+              <Text style={styles.note}>{hiFirst
+                ? 'मासिक योजना UPI AutoPay से हर माह ₹49 अपने-आप कटती है। कभी भी रद्द करें।'
+                : 'Monthly plan auto-debits ₹49 every month via UPI AutoPay. Cancel anytime.'}</Text>
+            )}
           </ScrollView>
         </View>
       </View>
@@ -204,8 +264,21 @@ const styles = StyleSheet.create({
   closeTxt: { fontSize: 18, color: Colors.textMuted },
   crown: { fontSize: 44, marginBottom: 4 },
   title: { fontSize: 20, fontWeight: '800', color: Colors.text, marginBottom: 2 },
-  price: { fontSize: 34, fontWeight: '800', color: Colors.primary, marginBottom: 16 },
+  price: { fontSize: 34, fontWeight: '800', color: Colors.primary, marginBottom: 16, marginTop: 6 },
   per: { fontSize: 15, fontWeight: '500', color: Colors.textMuted },
+  planRow: { flexDirection: 'row', alignSelf: 'stretch', gap: 10, marginTop: 14 },
+  planChip: {
+    flex: 1, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.border,
+    paddingVertical: 12, paddingHorizontal: 10, alignItems: 'center', backgroundColor: Colors.card,
+  },
+  planChipActive: { borderColor: Colors.primary, backgroundColor: Colors.primary + '12' },
+  planChipTitle: { fontSize: 13, fontWeight: '700', color: Colors.textSecondary, marginBottom: 2 },
+  planChipTitleActive: { color: Colors.primary },
+  planChipPrice: { fontSize: 18, fontWeight: '800', color: Colors.text },
+  planChipPriceActive: { color: Colors.primary },
+  planChipPer: { fontSize: 12, fontWeight: '500', color: Colors.textMuted },
+  planChipSave: { fontSize: 10, fontWeight: '600', color: Colors.textMuted, marginTop: 3, textAlign: 'center' },
+  planChipSaveActive: { color: Colors.primaryDark },
   benefits: { alignSelf: 'stretch', marginBottom: 18 },
   benefit: {
     fontSize: 14, color: Colors.textSecondary, paddingVertical: 8,

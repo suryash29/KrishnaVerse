@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Platform, Alert,
+  Platform, Alert, Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,6 +19,7 @@ export default function HomeScreen() {
   const [todayShloka, setTodayShloka] = useState(null);
   const [greeting, setGreeting] = useState('Good morning');
   const [showJapa, setShowJapa] = useState(false);
+  const [showTeaching, setShowTeaching] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -79,6 +80,13 @@ export default function HomeScreen() {
               {!!todayShloka.lifeApplication && (
                 <Text style={styles.application}>{todayShloka.lifeApplication}</Text>
               )}
+              <TouchableOpacity
+                style={styles.readMoreBtn}
+                onPress={() => setShowTeaching(true)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.readMoreText}>Read full teaching →</Text>
+              </TouchableOpacity>
             </LinearGradient>
           </View>
         )}
@@ -164,6 +172,58 @@ export default function HomeScreen() {
       </ScrollView>
 
       <JapaSheet visible={showJapa} onClose={() => setShowJapa(false)} />
+
+      {/* Full teaching for today's wisdom */}
+      <Modal
+        visible={showTeaching}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowTeaching(false)}
+      >
+        <SafeAreaView style={styles.teachSafe} edges={['top']}>
+          <View style={styles.teachHeader}>
+            <Text style={styles.teachHeaderTitle}>
+              {todayShloka ? `BG ${todayShloka.chapter}.${todayShloka.verse}` : 'Teaching'}
+            </Text>
+            <TouchableOpacity onPress={() => setShowTeaching(false)}>
+              <Text style={styles.teachClose}>Done</Text>
+            </TouchableOpacity>
+          </View>
+          {todayShloka && (
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.teachBody} showsVerticalScrollIndicator={false}>
+              <Text style={styles.teachChapter}>{todayShloka.chapterTitle}</Text>
+              <Text style={styles.teachSanskrit}>{todayShloka.sanskrit}</Text>
+              {!!todayShloka.transliteration && (
+                <Text style={styles.teachTranslit}>{todayShloka.transliteration}</Text>
+              )}
+
+              <Text style={styles.teachSectionLabel}>TRANSLATION</Text>
+              <Text style={styles.teachText}>{todayShloka.english}</Text>
+              {!!todayShloka.hindi && <Text style={styles.teachHindi}>{todayShloka.hindi}</Text>}
+
+              {!!todayShloka.context && (
+                <>
+                  <Text style={styles.teachSectionLabel}>CONTEXT</Text>
+                  <Text style={styles.teachText}>{todayShloka.context}</Text>
+                </>
+              )}
+              {!!todayShloka.explanation && (
+                <>
+                  <Text style={styles.teachSectionLabel}>EXPLANATION</Text>
+                  <Text style={styles.teachText}>{todayShloka.explanation}</Text>
+                </>
+              )}
+              {!!todayShloka.lifeApplication && (
+                <>
+                  <Text style={styles.teachSectionLabel}>APPLY IT TODAY</Text>
+                  <Text style={styles.teachText}>{todayShloka.lifeApplication}</Text>
+                </>
+              )}
+              <View style={{ height: 32 }} />
+            </ScrollView>
+          )}
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -283,6 +343,41 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     lineHeight: 20,
   },
+  readMoreBtn: {
+    marginTop: 14,
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(197,85,7,0.12)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  readMoreText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#C55507',
+  },
+  teachSafe: { flex: 1, backgroundColor: Colors.bg },
+  teachHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  teachHeaderTitle: { fontSize: 16, fontWeight: '700', color: Colors.primary },
+  teachClose: { fontSize: 15, fontWeight: '600', color: Colors.primary },
+  teachBody: { padding: 20 },
+  teachChapter: { fontSize: 12, color: Colors.textMuted, marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 },
+  teachSanskrit: { fontSize: 18, color: Colors.text, lineHeight: 30, fontWeight: '500', marginBottom: 10 },
+  teachTranslit: { fontSize: 13, color: Colors.textMuted, fontStyle: 'italic', lineHeight: 20 },
+  teachSectionLabel: {
+    fontSize: 11, fontWeight: '700', color: Colors.textMuted,
+    letterSpacing: 1.5, textTransform: 'uppercase', marginTop: 22, marginBottom: 8,
+  },
+  teachText: { fontSize: 15, color: Colors.textSecondary, lineHeight: 24 },
+  teachHindi: { fontSize: 15, color: Colors.textSecondary, lineHeight: 24, marginTop: 8 },
   moodCard: {
     backgroundColor: Colors.card,
     borderRadius: 16,

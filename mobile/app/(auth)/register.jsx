@@ -47,7 +47,11 @@ export default function RegisterScreen() {
       await register(email.trim(), password, name.trim());
       // Persist the optional phone to the user's profile (synced to cloud).
       if (phoneClean) update({ phone: phoneClean });
-      // Auth gate navigates to tabs automatically
+      // Navigate explicitly into the app. The AuthGate would also do this once
+      // `user` propagates, but register was pushed ON TOP of login, so the
+      // (auth) stack can briefly re-render to its first screen (login) before
+      // the gate fires. Replacing here makes the transition deterministic.
+      router.replace('/(tabs)');
     } catch (err) {
       Alert.alert('Registration Failed', getErrorMessage(err && err.code));
     } finally {

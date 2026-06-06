@@ -37,9 +37,17 @@ setGlobalOptions({ region: 'asia-south1', maxInstances: 10 });
 const RZP_KEY_ID = defineSecret('RAZORPAY_KEY_ID');
 const RZP_KEY_SECRET = defineSecret('RAZORPAY_KEY_SECRET');
 const RZP_WEBHOOK_SECRET = defineSecret('RAZORPAY_WEBHOOK_SECRET');
+// The Razorpay Plan id for the ₹49/month auto-debit subscription. Create the
+// plan once in Razorpay Dashboard → Subscriptions → Plans (₹49, monthly),
+// then: firebase functions:secrets:set RAZORPAY_MONTHLY_PLAN_ID
+const RZP_MONTHLY_PLAN_ID = defineSecret('RAZORPAY_MONTHLY_PLAN_ID');
 
-const PREMIUM_PRICE_INR = 199;            // ₹/year — the single source of truth
+const PREMIUM_PRICE_INR = 399;            // ₹/year — the single source of truth
 const PREMIUM_AMOUNT_PAISE = PREMIUM_PRICE_INR * 100;
+// Number of monthly billing cycles to authorise up front (Razorpay requires a
+// finite count). 120 = 10 years; the mandate keeps charging ₹49 until the user
+// cancels or it completes.
+const MONTHLY_TOTAL_COUNT = 120;
 
 function rzpClient() {
   return new Razorpay({
@@ -51,15 +59,16 @@ function rzpClient() {
 // The ONLY place premium is granted. Admin SDK → bypasses security rules.
 async function grantPremium(uid, meta = {}) {
   const db = admin.firestore();
-  await db.collection('users').doc(uid).set(
-    {
-      isPremium: true,
-      premiumSince: admin.firestore.FieldValue.serverTimestamp(),
-      premiumPlan: 'annual',
-      premiumOrderId: meta.orderId || null,
-    },
-    { merge: true }
-  );
+  const userDoc = {
+    isPremium: true,
+    premiumSince: admin.firestore.FieldValue.serverTimestamp(),
+    premiumPlan: meta.plan || 'annual',
+    premiumOrderId: meta.orderId || null,
+  };
+  // For subscriptions, remember which subscription owns the entitlement so we
+  // only revoke when THAT subscription ends (an annual buyer is never touched).
+  if (meta.subscriptionId) userDoc.premiumSubscriptionId = meta.subscriptionId;
+  await db.collection('users').doc(uid).set(userDoc, { merge: true });
   if (meta.orderId) {
     await db.collection('orders').doc(meta.orderId).set(
       {
@@ -72,6 +81,31 @@ async function grantPremium(uid, meta = {}) {
     ).catch((e) => logger.warn('order update failed', e));
   }
   logger.info('Premium granted', { uid, via: meta.via, orderId: meta.orderId });
+}
+
+// Revoke premium when a MONTHLY subscription ends (cancelled / halted /
+// completed). We only revoke if the entitlement is owned by this exact
+// subscription, so a separately-purchased annual plan is never affected.
+async function revokePremiumForSubscription(subscriptionId, meta = {}) {
+  if (!subscriptionId) return;
+  const db = admin.firestore();
+  let uid = meta.uid;
+  if (!uid) {
+    const snap = await db.collection('subscriptions').doc(subscriptionId).get();
+    if (snap.exists) uid = snap.data().userId;
+  }
+  if (!uid) { logger.warn('No uid to revoke for subscription', { subscriptionId }); return; }
+  const userRef = db.collection('users').doc(uid);
+  const userSnap = await userRef.get();
+  const data = userSnap.exists ? userSnap.data() : {};
+  if (data.premiumSubscriptionId && data.premiumSubscriptionId === subscriptionId) {
+    await userRef.set({ isPremium: false, premiumPlan: null }, { merge: true });
+    logger.info('Premium revoked (subscription ended)', { uid, subscriptionId, reason: meta.reason });
+  }
+  await db.collection('subscriptions').doc(subscriptionId).set(
+    { status: meta.reason || 'ended', endedAt: admin.firestore.FieldValue.serverTimestamp() },
+    { merge: true }
+  ).catch(() => {});
 }
 
 // 1) Create an order (web Razorpay Checkout) ───────────────
@@ -162,6 +196,34 @@ exports.razorpayWebhook = onRequest(
 
       const event = req.body;
       const type = event && event.event;
+
+      // ── Subscription (monthly auto-debit) lifecycle ──
+      // activated / charged → grant or extend premium; ended states → revoke.
+      const SUB_GRANT = ['subscription.activated', 'subscription.charged', 'subscription.resumed'];
+      const SUB_REVOKE = ['subscription.cancelled', 'subscription.halted', 'subscription.completed', 'subscription.expired'];
+      if (type && type.startsWith('subscription.')) {
+        const sub = event.payload && event.payload.subscription && event.payload.subscription.entity;
+        if (sub) {
+          const subscriptionId = sub.id;
+          let uid = sub.notes && sub.notes.uid;
+          if (!uid && subscriptionId) {
+            const snap = await admin.firestore().collection('subscriptions').doc(subscriptionId).get();
+            if (snap.exists) uid = snap.data().userId;
+          }
+          if (SUB_GRANT.includes(type) && uid) {
+            const paymentId = event.payload.payment && event.payload.payment.entity && event.payload.payment.entity.id;
+            await grantPremium(uid, { subscriptionId, paymentId, plan: 'monthly', via: 'subscription-webhook' });
+          } else if (SUB_REVOKE.includes(type)) {
+            await revokePremiumForSubscription(subscriptionId, { uid, reason: type.replace('subscription.', '') });
+          } else if (!uid) {
+            logger.warn('Subscription webhook had no uid', { type, subscriptionId });
+          }
+        }
+        res.status(200).send('ok');
+        return;
+      }
+
+      // ── One-time payment (annual) ──
       let entity = null;
       if (type === 'payment.captured') entity = event.payload.payment.entity;
       else if (type === 'order.paid') entity = event.payload.order.entity;
@@ -178,7 +240,7 @@ exports.razorpayWebhook = onRequest(
           const paymentId =
             type === 'payment.captured' ? entity.id :
             (event.payload.payment && event.payload.payment.entity && event.payload.payment.entity.id) || null;
-          await grantPremium(uid, { orderId, paymentId, via: 'webhook' });
+          await grantPremium(uid, { orderId, paymentId, plan: 'annual', via: 'webhook' });
         } else {
           logger.warn('Webhook had no uid to grant', { type, orderId });
         }
@@ -225,6 +287,46 @@ exports.createRazorpayPaymentLink = onCall(
     } catch (e) {
       logger.error('createRazorpayPaymentLink failed', e);
       throw new HttpsError('internal', 'Could not create the payment link.');
+    }
+  }
+);
+
+// 5) Monthly auto-debit subscription (₹49/mo) — web + mobile ──
+//    Creates a Razorpay Subscription against the monthly plan and returns its
+//    hosted short_url. The user authorises the UPI AutoPay mandate there; from
+//    then on Razorpay charges ₹49/month and fires `subscription.charged`, which
+//    the webhook above turns into a premium grant/extension. Entitlement is
+//    NEVER decided on the client.
+exports.createRazorpaySubscription = onCall(
+  { secrets: [RZP_KEY_ID, RZP_KEY_SECRET, RZP_MONTHLY_PLAN_ID] },
+  async (req) => {
+    if (!req.auth) throw new HttpsError('unauthenticated', 'Please sign in to subscribe.');
+    const uid = req.auth.uid;
+    const planId = RZP_MONTHLY_PLAN_ID.value();
+    if (!planId) throw new HttpsError('failed-precondition', 'Monthly plan is not configured yet.');
+    try {
+      const sub = await rzpClient().subscriptions.create({
+        plan_id: planId,
+        total_count: MONTHLY_TOTAL_COUNT,
+        customer_notify: 1,
+        notes: { uid, plan: 'premium-monthly' },
+      });
+      await admin.firestore().collection('subscriptions').doc(sub.id).set(
+        {
+          userId: uid,
+          subscriptionId: sub.id,
+          planId,
+          plan: 'premium-monthly',
+          status: sub.status || 'created',
+          channel: 'razorpay-subscription',
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+      return { url: sub.short_url, id: sub.id, status: sub.status };
+    } catch (e) {
+      logger.error('createRazorpaySubscription failed', e);
+      throw new HttpsError('internal', 'Could not start the subscription. Please try again.');
     }
   }
 );

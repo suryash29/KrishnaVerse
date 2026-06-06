@@ -52,12 +52,13 @@ export default function TabsLayout() {
           ),
         }}
       />
+      {/* Shop is on hold for now. The screen file (shop.jsx) is kept intact;
+          href:null removes it from the tab bar without deleting it. To bring
+          it back, restore the tabBarIcon and remove the href:null line. */}
       <Tabs.Screen
         name="shop"
         options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon emoji="🛕" label="Shop" focused={focused} />
-          ),
+          href: null,
         }}
       />
       <Tabs.Screen

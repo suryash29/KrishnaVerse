@@ -20,8 +20,19 @@ const KV_CONFIG = {
     gita:    'spreadgita@upi',
     culture: 'dharmamovement@upi',
   },
-  premiumUpi:   'krishnaverse@upi', // TODO: set real UPI ID for ₹199/yr Premium
-  premiumPrice: 199,                // ₹/year
+  premiumUpi:        'krishnaverse@upi', // TODO: set real UPI ID for Premium
+  premiumPriceYear:  399,                // ₹/year (one-time order — works today)
+  premiumPriceMonth: 49,                 // ₹/month (recurring — needs Razorpay Subscriptions)
+  premiumPrice:      399,                // back-compat alias = annual price
+
+  // ── Google AdSense (web/PWA only — premium users never see ads) ──
+  // Paste your AdSense publisher ID (looks like 'ca-pub-1234567890123456')
+  // and a display ad-unit slot ID. Leave BOTH '' to disable ads entirely
+  // (nothing loads, no broken script). Ads render ONLY when both are set
+  // AND the signed-in user is not premium.
+  adsensePublisherId: '', // TODO: e.g. 'ca-pub-XXXXXXXXXXXXXXXX'
+  adsenseSlotId:      '', // TODO: e.g. '1234567890'
+
   appVersion:   '1.1.0',            // single source of truth — keep in sync everywhere
 };
 window.KV_CONFIG = KV_CONFIG;
@@ -137,7 +148,7 @@ const STATE = {
   chatHistory: [],
   initialized: false,
   userId: null,        // Firebase uid when signed in (for cloud sync)
-  isPremium: false,    // ₹199/yr — unlocks word-by-word for non-curated verses
+  isPremium: false,    // ₹399/yr — unlocks word-by-word for non-curated verses
   // Japa (digital mala): one round = 108 beads. todayCount resets each day;
   // totalCount is lifetime. Rounds are derived (count / 108).
   japa: {
@@ -176,6 +187,11 @@ function scheduleCloudSave() {
   if (!STATE.userId || !window.__kvCloud) return;
   clearTimeout(__kvCloudSaveTimer);
   __kvCloudSaveTimer = setTimeout(() => {
+    // IMPORTANT: isPremium is a server-granted ENTITLEMENT, never client data.
+    // Firestore rules REJECT any client write that changes isPremium, and a
+    // rejected write fails the ENTIRE save — silently breaking ALL cloud sync.
+    // We omit it here; merge:true preserves the server value, and premium
+    // granted by the Cloud Function flows back via load → mergeCloudIntoState.
     window.__kvCloud.save(STATE.userId, {
       language: STATE.language,
       darkMode: STATE.darkMode,
@@ -185,7 +201,6 @@ function scheduleCloudSave() {
       journal: STATE.journal,
       moodHistory: STATE.moodHistory,
       streak: STATE.streak,
-      isPremium: STATE.isPremium,
       japa: STATE.japa,
     });
   }, 1200);
@@ -434,6 +449,9 @@ function getTranslation(shloka) {
 
 // ── Navigation ─────────────────────────────────────────────
 function navigateTo(screen) {
+  // Shop is on hold for now. Files/markup are kept, but any attempt to
+  // navigate to it (e.g. a stray deep-link) falls back to Home.
+  if (screen === 'shop') screen = 'home';
   if (screen === STATE.currentScreen) return;
   STATE.previousScreen = STATE.currentScreen;
   STATE.currentScreen = screen;
@@ -543,6 +561,53 @@ function renderHome() {
 
   // Achievements
   renderAchievementsRow();
+
+  // Ads (non-premium only)
+  refreshAds();
+}
+
+// ── Ads (web/PWA only — Google AdSense; premium users are ad-free) ──────
+// First principles: (1) paying users must NEVER see ads; (2) when unconfigured
+// nothing should load (no broken script, no layout shift). We inject the
+// AdSense loader lazily, once, only when a publisher ID + slot are set AND the
+// signed-in user is not premium. Mobile uses AdMob instead (native build).
+let __kvAdsLoaded = false;
+function adsEnabled() {
+  const pub  = KV_CONFIG && KV_CONFIG.adsensePublisherId;
+  const slot = KV_CONFIG && KV_CONFIG.adsenseSlotId;
+  return !!(pub && slot && !STATE.isPremium);
+}
+function loadAdSenseScript() {
+  if (__kvAdsLoaded) return;
+  const s = document.createElement('script');
+  s.async = true;
+  s.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=' +
+          encodeURIComponent(KV_CONFIG.adsensePublisherId);
+  s.crossOrigin = 'anonymous';
+  document.head.appendChild(s);
+  __kvAdsLoaded = true;
+}
+function refreshAds() {
+  document.querySelectorAll('.ad-slot').forEach(slot => {
+    if (!adsEnabled()) { slot.hidden = true; slot.innerHTML = ''; delete slot.dataset.kvFilled; return; }
+    loadAdSenseScript();
+    if (!slot.dataset.kvFilled) {
+      slot.innerHTML =
+        '<ins class="adsbygoogle" style="display:block" ' +
+        'data-ad-client="' + KV_CONFIG.adsensePublisherId + '" ' +
+        'data-ad-slot="' + KV_CONFIG.adsenseSlotId + '" ' +
+        'data-ad-format="auto" data-full-width-responsive="true"></ins>';
+      slot.dataset.kvFilled = '1';
+      try { (window.adsbygoogle = window.adsbygoogle || []).push({}); } catch (e) {}
+    }
+    slot.hidden = false;
+  });
+}
+// When a user upgrades, strip any ads already rendered on the page.
+function removeAdsForPremium() {
+  document.querySelectorAll('.ad-slot').forEach(slot => {
+    slot.hidden = true; slot.innerHTML = ''; delete slot.dataset.kvFilled;
+  });
 }
 
 function renderMoodGrid(containerId, onSelect) {
@@ -914,7 +979,7 @@ function openShlokaDetail(shloka) {
         <div class="sd-lock-sub">${hiFirst
           ? 'सभी 700 श्लोकों का संस्कृत-शब्दार्थ (हिंदी + अंग्रेज़ी) — KrishnaVerse Premium में।'
           : 'Sanskrit word meanings (Hindi + English) for all 700 verses — with KrishnaVerse Premium.'}</div>
-        <div class="sd-lock-cta">${hiFirst ? 'प्रीमियम लें · ₹199/वर्ष' : 'Go Premium · ₹199/year'} →</div>
+        <div class="sd-lock-cta">${hiFirst ? 'प्रीमियम लें · ₹399/वर्ष' : 'Go Premium · ₹399/year'} →</div>
       </div>
     </div>`;
   } else if (hasWBW) {
@@ -986,7 +1051,7 @@ function openShlokaDetail(shloka) {
           <div class="sd-lock-sub">${hiFirst
             ? 'शुद्ध संस्कृत उच्चारण में पूरे अध्याय का पाठ — KrishnaVerse Premium में।'
             : 'Full-chapter chanting in pure Sanskrit pronunciation — with KrishnaVerse Premium.'}</div>
-          <div class="sd-lock-cta">${hiFirst ? 'प्रीमियम लें · ₹199/वर्ष' : 'Go Premium · ₹199/year'} →</div>
+          <div class="sd-lock-cta">${hiFirst ? 'प्रीमियम लें · ₹399/वर्ष' : 'Go Premium · ₹399/year'} →</div>
         </div>
       </div>`;
   }
@@ -1887,17 +1952,34 @@ function placeOrder(productId, waLink) {
 }
 window.placeOrder = placeOrder;
 
-// ── Premium (₹199/yr) upgrade ──────────────────────────────
+// ── Premium (₹399/yr) upgrade ──────────────────────────────
 // First principles: the value the user pays for is word-by-word Sanskrit
 // meaning across ALL 700 verses (the 23 curated ones are free). Payment
 // is handled out-of-band via UPI/WhatsApp; we record intent and unlock
 // optimistically so the experience is smooth, with cloud as source of truth.
+// Selected billing plan for the premium modal: 'annual' (default, one-time —
+// works today) or 'monthly' (₹49, currently a manual monthly UPI renewal until
+// Razorpay Subscriptions auto-debit is wired server-side).
+window.__kvPremiumPlan = window.__kvPremiumPlan || 'annual';
+
+function selectPremiumPlan(plan) {
+  window.__kvPremiumPlan = (plan === 'monthly') ? 'monthly' : 'annual';
+  requestPremiumUpgrade(); // re-render the modal with the chosen plan
+}
+window.selectPremiumPlan = selectPremiumPlan;
+
 function requestPremiumUpgrade() {
   const hiFirst = STATE.language === 'hi';
-  const price = (KV_CONFIG && KV_CONFIG.premiumPrice) ? KV_CONFIG.premiumPrice : 199;
+  const priceYear = (KV_CONFIG && KV_CONFIG.premiumPriceYear) ? KV_CONFIG.premiumPriceYear : 399;
+  const priceMonth = (KV_CONFIG && KV_CONFIG.premiumPriceMonth) ? KV_CONFIG.premiumPriceMonth : 49;
+  const isAnnual = window.__kvPremiumPlan !== 'monthly';
+  const price = isAnnual ? priceYear : priceMonth;
+  const periodLabel = isAnnual ? (hiFirst ? 'वर्ष' : 'year') : (hiFirst ? 'माह' : 'month');
+  const periodShort = isAnnual ? (hiFirst ? 'वर्ष' : 'yr') : (hiFirst ? 'माह' : 'mo');
   const upi = (KV_CONFIG && KV_CONFIG.premiumUpi) ? KV_CONFIG.premiumUpi : '';
   const waNum = (KV_CONFIG && KV_CONFIG.shopWhatsApp) ? KV_CONFIG.shopWhatsApp : '';
   const waBase = waNum ? `https://wa.me/${waNum}` : `https://wa.me/`;
+  const savePct = Math.max(0, Math.round((1 - priceYear / (priceMonth * 12)) * 100));
 
   let modal = document.getElementById('premiumModal');
   if (!modal) {
@@ -1912,22 +1994,50 @@ function requestPremiumUpgrade() {
     ? ['सभी 700 श्लोकों का शब्द-दर-शब्द अर्थ', 'हिंदी + अंग्रेज़ी, दोनों भाषाओं में', 'भविष्य के सभी अपडेट शामिल', 'गौ-सेवा व प्रचार में योगदान']
     : ['Word-by-word meaning for all 700 verses', 'Both Hindi & English, side by side', 'All future updates included', 'Supports Gita propagation & go-seva'];
 
-  // Razorpay UPI Checkout is the primary path when the user is signed in and
-  // Cloud Functions + the Razorpay SDK are available. WhatsApp/UPI stay as a
-  // manual fallback so the upgrade never hits a dead end.
-  const canRazorpay = !!(STATE.userId && window.kvFunctions && typeof Razorpay !== 'undefined');
-  const rzpBtn = canRazorpay ? `
+  // Plan chooser — Annual (best value) vs Monthly.
+  const planChooser = `
+      <div class="pr-plans">
+        <button type="button" class="pr-plan ${isAnnual ? 'active' : ''}" onclick="selectPremiumPlan('annual')">
+          <span class="pr-plan-name">${hiFirst ? 'वार्षिक' : 'Annual'}</span>
+          <span class="pr-plan-price">₹${priceYear}<small>/${hiFirst ? 'वर्ष' : 'yr'}</small></span>
+          <span class="pr-plan-sub">${hiFirst ? `₹${Math.round(priceYear / 12)}/माह` : `₹${Math.round(priceYear / 12)}/mo · save ${savePct}%`}</span>
+        </button>
+        <button type="button" class="pr-plan ${!isAnnual ? 'active' : ''}" onclick="selectPremiumPlan('monthly')">
+          <span class="pr-plan-name">${hiFirst ? 'मासिक' : 'Monthly'}</span>
+          <span class="pr-plan-price">₹${priceMonth}<small>/${hiFirst ? 'माह' : 'mo'}</small></span>
+          <span class="pr-plan-sub">${hiFirst ? 'हर माह नवीनीकरण' : 'renews monthly'}</span>
+        </button>
+      </div>`;
+
+  // Razorpay paths (signed in + Cloud Functions available):
+  //  • Annual → one-time UPI Checkout (needs the Razorpay JS SDK).
+  //  • Monthly → UPI AutoPay Subscription (server mints it; we open the hosted
+  //    authorisation URL — no Razorpay JS object required).
+  const signedIn = !!(STATE.userId && window.kvFunctions);
+  const canRazorpay = !!(signedIn && typeof Razorpay !== 'undefined' && isAnnual);
+  const canSubscribe = !!(signedIn && !isAnnual);
+  let rzpBtn = '';
+  if (canRazorpay) {
+    rzpBtn = `
       <button class="pm-rzp-btn" id="rzpPayBtn" type="button" onclick="payWithRazorpay()">
         ${hiFirst ? `UPI से ₹${price} भुगतान करें` : `Pay ₹${price} with UPI`}
       </button>
-      <div class="pr-or">${hiFirst ? 'या' : 'or'}</div>` : '';
+      <div class="pr-or">${hiFirst ? 'या' : 'or'}</div>`;
+  } else if (canSubscribe) {
+    rzpBtn = `
+      <button class="pm-rzp-btn" id="rzpSubBtn" type="button" onclick="payWithRazorpaySubscription()">
+        ${hiFirst ? `UPI AutoPay से ₹${price}/माह` : `Subscribe ₹${price}/mo · UPI AutoPay`}
+      </button>
+      <div class="pr-or">${hiFirst ? 'या' : 'or'}</div>`;
+  }
 
   modal.innerHTML = `
     <div class="modal-card premium-card" onclick="event.stopPropagation()">
       <button class="modal-close" onclick="closePremiumModal()" aria-label="Close">×</button>
       <div class="pr-crown">🪔</div>
       <div class="pr-title">${hiFirst ? 'KrishnaVerse प्रीमियम' : 'KrishnaVerse Premium'}</div>
-      <div class="pr-price">₹${price}<span>/${hiFirst ? 'वर्ष' : 'year'}</span></div>
+      ${planChooser}
+      <div class="pr-price">₹${price}<span>/${periodLabel}</span></div>
       <ul class="pr-benefits">
         ${benefits.map(b => `<li>✓ ${b}</li>`).join('')}
       </ul>
@@ -1938,11 +2048,14 @@ function requestPremiumUpgrade() {
         <button class="dm-copy-btn" onclick="copyUpiId('${upi}')">📋 ${hiFirst ? 'UPI ID कॉपी करें' : 'Copy UPI ID'}</button>
       ` : ''}
       <button class="pm-wa-btn" type="button" onclick="proceedPremium()">
-        ${hiFirst ? `WhatsApp पर प्रीमियम लें · ₹${price}/वर्ष` : `Get Premium on WhatsApp · ₹${price}/yr`}
+        ${hiFirst ? `WhatsApp पर प्रीमियम लें · ₹${price}/${periodShort}` : `Get Premium on WhatsApp · ₹${price}/${periodShort}`}
       </button>
       <div class="pr-note">${hiFirst
         ? 'भुगतान की पुष्टि के बाद आपका खाता अनलॉक कर दिया जाएगा। 🙏'
         : 'Your account is unlocked once payment is confirmed. 🙏'}</div>
+      ${!isAnnual ? `<div class="pr-note">${hiFirst
+        ? 'मासिक योजना UPI AutoPay से हर माह ₹49 अपने-आप कटती है। कभी भी रद्द करें।'
+        : 'Monthly plan auto-debits ₹49 every month via UPI AutoPay. Cancel anytime.'}</div>` : ''}
     </div>`;
   modal.classList.remove('hidden');
 }
@@ -1953,7 +2066,7 @@ function requestPremiumUpgrade() {
 // webhook is the backstop if the device drops off after paying.
 async function payWithRazorpay() {
   const hi = STATE.language === 'hi';
-  const price = (KV_CONFIG && KV_CONFIG.premiumPrice) ? KV_CONFIG.premiumPrice : 199;
+  const price = (KV_CONFIG && KV_CONFIG.premiumPrice) ? KV_CONFIG.premiumPrice : 399;
   if (!STATE.userId || !window.kvFunctions) { showToast(hi ? 'कृपया पहले साइन इन करें' : 'Please sign in first'); return; }
   if (typeof Razorpay === 'undefined') { showToast(hi ? 'भुगतान लोड नहीं हो सका' : 'Payment could not load'); return; }
   const btn = document.getElementById('rzpPayBtn');
@@ -1987,6 +2100,7 @@ async function payWithRazorpay() {
           });
           STATE.isPremium = true;
           saveState();
+          if (typeof removeAdsForPremium === 'function') removeAdsForPremium();
           closePremiumModal();
           if (typeof renderHome === 'function') renderHome();
           showToast(hi ? '🪔 प्रीमियम सक्रिय! हरे कृष्ण' : '🪔 Premium activated! Hare Krishna');
@@ -2005,10 +2119,42 @@ async function payWithRazorpay() {
   }
 }
 window.payWithRazorpay = payWithRazorpay;
+
+// Monthly auto-debit (₹49/mo). The server creates a Razorpay Subscription and
+// returns its hosted authorisation URL; we open it so the user can approve the
+// UPI AutoPay mandate. Premium is granted by the subscription webhook once the
+// mandate is active — never on the client. The entitlement then syncs to every
+// device via loadState → mergeCloudIntoState.
+async function payWithRazorpaySubscription() {
+  const hi = STATE.language === 'hi';
+  if (!STATE.userId || !window.kvFunctions) { showToast(hi ? 'कृपया पहले साइन इन करें' : 'Please sign in first'); return; }
+  const btn = document.getElementById('rzpSubBtn');
+  const priceMonth = (KV_CONFIG && KV_CONFIG.premiumPriceMonth) ? KV_CONFIG.premiumPriceMonth : 49;
+  const label = hi ? `UPI AutoPay से ₹${priceMonth}/माह` : `Subscribe ₹${priceMonth}/mo · UPI AutoPay`;
+  const setBtn = (txt, dis) => { if (btn) { btn.textContent = txt; btn.disabled = dis; } };
+  setBtn(hi ? 'लोड हो रहा है…' : 'Loading…', true);
+  try {
+    const createSub = window.kvFunctions.httpsCallable('createRazorpaySubscription');
+    const res = await createSub({});
+    const d = (res && res.data) || {};
+    if (!d.url) throw new Error('subscription failed');
+    // Open Razorpay's hosted mandate-authorisation page.
+    window.open(d.url, '_blank', 'noopener');
+    showToast(hi ? 'UPI AutoPay सेट करने के लिए पेज खुल रहा है…' : 'Opening UPI AutoPay setup…');
+    setBtn(label, false);
+  } catch (e) {
+    setBtn(label, false);
+    showToast(hi ? 'सदस्यता शुरू नहीं हो सकी। कृपया पुनः प्रयास करें।' : 'Could not start the subscription. Please try again.');
+  }
+}
+window.payWithRazorpaySubscription = payWithRazorpaySubscription;
 window.requestPremiumUpgrade = requestPremiumUpgrade;
 
 function proceedPremium() {
-  const price = (KV_CONFIG && KV_CONFIG.premiumPrice) ? KV_CONFIG.premiumPrice : 199;
+  const isAnnual = window.__kvPremiumPlan !== 'monthly';
+  const price = isAnnual
+    ? ((KV_CONFIG && KV_CONFIG.premiumPriceYear) ? KV_CONFIG.premiumPriceYear : 399)
+    : ((KV_CONFIG && KV_CONFIG.premiumPriceMonth) ? KV_CONFIG.premiumPriceMonth : 49);
   const upi = (KV_CONFIG && KV_CONFIG.premiumUpi) ? KV_CONFIG.premiumUpi : '';
   const waNum = (KV_CONFIG && KV_CONFIG.shopWhatsApp) ? KV_CONFIG.shopWhatsApp : '';
   const waBase = waNum ? `https://wa.me/${waNum}` : `https://wa.me/`;
@@ -2016,12 +2162,12 @@ function proceedPremium() {
   if (window.__kvCloud && typeof window.__kvCloud.createOrder === 'function') {
     window.__kvCloud.createOrder({
       userId: STATE.userId || null,
-      items: [{ id: 'premium-annual', name: 'KrishnaVerse Premium (Annual)', price: '₹' + price, category: 'subscription' }],
+      items: [{ id: isAnnual ? 'premium-annual' : 'premium-monthly', name: isAnnual ? 'KrishnaVerse Premium (Annual)' : 'KrishnaVerse Premium (Monthly)', price: '₹' + price, category: 'subscription' }],
       status: 'pending',
       channel: 'whatsapp',
     });
   }
-  const msg = encodeURIComponent(`Jai Shri Krishna! 🙏\n\nI want *KrishnaVerse Premium* (word-by-word for all 700 verses) for ₹${price}/year.${upi ? `\n\nUPI: ${upi}` : ''}\n\nHare Krishna 🪔`);
+  const msg = encodeURIComponent(`Jai Shri Krishna! 🙏\n\nI want *KrishnaVerse Premium* (word-by-word for all 700 verses) for ₹${price}/${isAnnual ? 'year' : 'month'}.${upi ? `\n\nUPI: ${upi}` : ''}\n\nHare Krishna 🪔`);
   window.open(`${waBase}?text=${msg}`, '_blank', 'noopener');
   showToast(STATE.language === 'hi' ? 'जय श्री कृष्ण! WhatsApp खुल रहा है…' : 'Jai Shri Krishna! Opening WhatsApp...');
 }
@@ -2325,7 +2471,7 @@ function openProfileModal() {
         <span class="pf-premium-ico">🪔</span>
         <div>
           <div class="pf-premium-title">Upgrade to Premium</div>
-          <div class="pf-premium-sub">Word-by-word for all 700 verses + authentic recitations · ₹199/year</div>
+          <div class="pf-premium-sub">Word-by-word for all 700 verses + authentic recitations · ₹399/year</div>
         </div>
         <span class="pf-premium-cta">Upgrade →</span>
       </div>

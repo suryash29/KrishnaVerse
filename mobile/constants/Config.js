@@ -12,8 +12,20 @@ export const KV_CONFIG = {
     gita: 'gitadaan@upi',
     temple: 'templeseva@upi',
   },
-  premiumUpi: 'krishnaverse@upi', // TODO: set real UPI ID for ₹199/yr Premium
-  premiumPrice: 199,              // ₹/year
+  premiumUpi: 'krishnaverse@upi', // TODO: set real UPI ID for Premium
+  premiumPriceYear: 399,          // ₹/year (one-time order — works today)
+  premiumPriceMonth: 49,          // ₹/month (recurring — needs Razorpay Subscriptions)
+  premiumPrice: 399,              // back-compat alias = annual price
+
+  // ── Google AdMob (mobile only — premium users are ad-free) ──
+  // NOTE: AdSense does NOT work in React Native. Mobile must use AdMob via the
+  // `react-native-google-mobile-ads` package, which requires a NATIVE build
+  // (EAS build / dev-client — NOT Expo Go). Until that package is installed and
+  // these IDs are set, no ads render. Gate every banner on `!isPremium`.
+  admobAndroidAppId: '', // e.g. 'ca-app-pub-XXXXXXXXXXXXXXXX~XXXXXXXXXX'
+  admobIosAppId:     '', // e.g. 'ca-app-pub-XXXXXXXXXXXXXXXX~XXXXXXXXXX'
+  admobBannerUnitId: '', // e.g. 'ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX'
+
   appVersion: '1.1.0',            // single source of truth — keep in sync everywhere
 };
 

@@ -225,7 +225,7 @@ export default function ExploreScreen() {
                     <Text style={styles.lockSub}>{hiFirst
                       ? 'सभी 700 श्लोकों का संस्कृत-शब्दार्थ (हिंदी + अंग्रेज़ी)।'
                       : 'Sanskrit word meanings (Hindi + English) for all 700 verses.'}</Text>
-                    <Text style={styles.lockCta}>{hiFirst ? 'प्रीमियम लें · ₹199/वर्ष →' : 'Go Premium · ₹199/year →'}</Text>
+                    <Text style={styles.lockCta}>{hiFirst ? 'प्रीमियम लें · ₹399/वर्ष →' : 'Go Premium · ₹399/year →'}</Text>
                   </View>
                 </TouchableOpacity>
               ) : Array.isArray(selectedShloka.wordByWord) && selectedShloka.wordByWord.length > 0 ? (

@@ -130,7 +130,7 @@ export default function ProfileScreen() {
               <Text style={styles.premiumIco}>🪔</Text>
               <View style={{ flex: 1 }}>
                 <Text style={styles.premiumTitle}>{hiFirst ? 'प्रीमियम लें' : 'Upgrade to Premium'}</Text>
-                <Text style={styles.premiumSub}>{hiFirst ? 'सभी 700 श्लोकों का शब्द-दर-शब्द + प्रामाणिक पाठ · ₹199/वर्ष' : 'Word-by-word for all 700 verses + authentic recitations · ₹199/year'}</Text>
+                <Text style={styles.premiumSub}>{hiFirst ? 'सभी 700 श्लोकों का शब्द-दर-शब्द + प्रामाणिक पाठ · ₹399/वर्ष' : 'Word-by-word for all 700 verses + authentic recitations · ₹399/year'}</Text>
               </View>
               <Text style={styles.premiumCta}>{hiFirst ? 'लें →' : 'Upgrade →'}</Text>
             </TouchableOpacity>

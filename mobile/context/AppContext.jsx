@@ -16,7 +16,7 @@ const defaultState = {
   moodHistory: [],
   streak: { current: 0, best: 0, lastDate: null },
   todayMood: null,
-  isPremium: false, // ₹199/yr — unlocks word-by-word for non-curated verses
+  isPremium: false, // ₹399/yr — unlocks word-by-word for non-curated verses
   // Japa (digital mala): one round = 108 beads. todayCount resets daily.
   japa: {
     mantra: 'radhe', customText: '', todayCount: 0, totalCount: 0,
@@ -72,9 +72,16 @@ export function AppProvider({ children }) {
   useEffect(() => {
     if (!loaded || !user || !cloudSynced) return;
     if (cloudTimer.current) clearTimeout(cloudTimer.current);
-    const { darkMode, language, phone, bookmarks, notes, journal, moodHistory, streak, isPremium, japa } = state;
+    // IMPORTANT: isPremium is a server-granted ENTITLEMENT, not user data.
+    // Firestore rules REJECT any client write that changes isPremium — and a
+    // rejected write fails the ENTIRE setDoc, silently breaking ALL cloud sync
+    // (bookmarks, journal, streak…). So we never include isPremium in the
+    // payload. With merge:true, the server-stored isPremium is preserved, and
+    // premium granted by the Cloud Function (after payment) flows back via
+    // loadUserData → mergeCloudIntoState on every device.
+    const { darkMode, language, phone, bookmarks, notes, journal, moodHistory, streak, japa } = state;
     cloudTimer.current = setTimeout(() => {
-      saveUserData(user.uid, { darkMode, language, phone, bookmarks, notes, journal, moodHistory, streak, isPremium, japa });
+      saveUserData(user.uid, { darkMode, language, phone, bookmarks, notes, journal, moodHistory, streak, japa });
     }, 1200);
     return () => { if (cloudTimer.current) clearTimeout(cloudTimer.current); };
   }, [state, loaded, user, cloudSynced]);
