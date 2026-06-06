@@ -27,8 +27,23 @@ service cloud.firestore {
     }
 
     // ── User profiles / app data: each user owns their doc ──
+    //  Premium is an ENTITLEMENT, not user data: it may only be granted by a
+    //  Cloud Function (Admin SDK bypasses these rules). A client may write its
+    //  own doc but can NEVER set isPremium=true itself — only keep it unchanged
+    //  or turn it off. This is what makes the Razorpay flow trustworthy.
+    function ownsDoc() { return isSignedIn() && request.auth.uid == uid; }
+    // The client may never CHANGE isPremium in either direction (granting or
+    // revoking). It must equal what's already stored; a brand-new doc must be
+    // non-premium. Only a Cloud Function (Admin SDK) can flip it.
+    function premiumUnchanged() {
+      return request.resource.data.get('isPremium', false)
+        == (resource != null ? resource.data.get('isPremium', false) : false);
+    }
     match /users/{uid} {
-      allow read, write: if isSignedIn() && request.auth.uid == uid;
+      allow read: if ownsDoc();
+      allow create: if ownsDoc() && request.resource.data.get('isPremium', false) == false;
+      allow update: if ownsDoc() && premiumUnchanged();
+      allow delete: if ownsDoc();
 
       // Nested per-user collections (bookmarks, journal, progress…)
       match /{document=**} {

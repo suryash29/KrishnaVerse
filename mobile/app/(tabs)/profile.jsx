@@ -9,10 +9,13 @@ import { StatusBar } from 'expo-status-bar';
 import { useAuth } from '../../context/AuthContext';
 import { useApp } from '../../context/AppContext';
 import { Colors } from '../../constants/Colors';
+import PremiumSheet from '../../components/PremiumSheet';
 
 export default function ProfileScreen() {
   const { user, logout, resendVerification, updateDisplayName, changePassword } = useAuth();
-  const { bookmarks, journal, streak } = useApp();
+  const { bookmarks, journal, streak, isPremium, language } = useApp();
+  const hiFirst = language === 'hi';
+  const [showPremium, setShowPremium] = useState(false);
 
   const [name, setName] = useState(user?.displayName || '');
   const [savingName, setSavingName] = useState(false);
@@ -91,6 +94,28 @@ export default function ProfileScreen() {
           <Stat num={(streak && streak.current) || 0} label="Day Streak" />
         </View>
 
+        {/* Premium: upgrade entry point (or active badge) */}
+        <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
+          {isPremium ? (
+            <View style={[styles.premiumCard, styles.premiumCardOn]}>
+              <Text style={styles.premiumIco}>🪔</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.premiumTitle}>{hiFirst ? 'KrishnaVerse प्रीमियम' : 'KrishnaVerse Premium'}</Text>
+                <Text style={styles.premiumSub}>{hiFirst ? 'सक्रिय · सभी शब्द-दर-शब्द व पाठ अनलॉक' : 'Active · all word-by-word & recitations unlocked'}</Text>
+              </View>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.premiumCard} activeOpacity={0.85} onPress={() => setShowPremium(true)}>
+              <Text style={styles.premiumIco}>🪔</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.premiumTitle}>{hiFirst ? 'प्रीमियम लें' : 'Upgrade to Premium'}</Text>
+                <Text style={styles.premiumSub}>{hiFirst ? 'सभी 700 श्लोकों का शब्द-दर-शब्द + प्रामाणिक पाठ · ₹199/वर्ष' : 'Word-by-word for all 700 verses + authentic recitations · ₹199/year'}</Text>
+              </View>
+              <Text style={styles.premiumCta}>{hiFirst ? 'लें →' : 'Upgrade →'}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>DISPLAY NAME</Text>
           <View style={styles.row}>
@@ -126,6 +151,8 @@ export default function ProfileScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      <PremiumSheet visible={showPremium} onClose={() => setShowPremium(false)} />
     </SafeAreaView>
   );
 }
@@ -158,6 +185,19 @@ const styles = StyleSheet.create({
   stat: { flex: 1, backgroundColor: Colors.card, borderRadius: 12, borderWidth: 1, borderColor: Colors.border, alignItems: 'center', paddingVertical: 14 },
   statNum: { fontSize: 22, fontWeight: '700', color: Colors.primary },
   statLbl: { fontSize: 11, color: Colors.textMuted, marginTop: 2 },
+  premiumCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: '#FFF6E6', borderRadius: 14, padding: 14,
+    borderWidth: 1, borderColor: '#F2C879',
+  },
+  premiumCardOn: { backgroundColor: '#FDF3E0' },
+  premiumIco: { fontSize: 26 },
+  premiumTitle: { fontSize: 15, fontWeight: '700', color: '#8A4B0A' },
+  premiumSub: { fontSize: 12, color: Colors.textMuted, marginTop: 2, lineHeight: 17 },
+  premiumCta: {
+    fontSize: 13, fontWeight: '700', color: '#fff',
+    backgroundColor: Colors.primary, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999,
+  },
   section: { paddingHorizontal: 16, paddingVertical: 8, gap: 8 },
   sectionLabel: { fontSize: 11, fontWeight: '700', color: Colors.textMuted, letterSpacing: 1.5 },
   row: { flexDirection: 'row', gap: 8 },

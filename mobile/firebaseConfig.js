@@ -11,6 +11,7 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, initializeAuth, getReactNativePersistence } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
+import { getFunctions } from 'firebase/functions';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -49,5 +50,9 @@ try {
 // Cloud Firestore – live product catalog, orders, profiles
 const db = getFirestore(app);
 
-export { auth, db };
+// Cloud Functions – Razorpay (UPI) premium upgrade.
+// Region MUST match functions/index.js setGlobalOptions region.
+const functions = getFunctions(app, 'asia-south1');
+
+export { auth, db, functions };
 export default app;

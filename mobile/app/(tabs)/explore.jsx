@@ -8,6 +8,8 @@ import { StatusBar } from 'expo-status-bar';
 import { SHLOKAS, CHAPTERS, searchShlokas, getShlokasByChapter } from '../../constants/Shlokas';
 import { Colors } from '../../constants/Colors';
 import { useApp } from '../../context/AppContext';
+import PremiumSheet from '../../components/PremiumSheet';
+import VerseAudio from '../../components/VerseAudio';
 
 const TABS = ['Chapters', 'All Shlokas', 'Search'];
 
@@ -16,7 +18,9 @@ export default function ExploreScreen() {
   const [query, setQuery] = useState('');
   const [selectedShloka, setSelectedShloka] = useState(null);
   const [selectedChapter, setSelectedChapter] = useState(null);
-  const { toggleBookmark, isBookmarked } = useApp();
+  const [showPremium, setShowPremium] = useState(false);
+  const { toggleBookmark, isBookmarked, language, isPremium } = useApp();
+  const hiFirst = language === 'hi';
 
   const searchResults = useMemo(() => {
     if (!query.trim()) return [];
@@ -206,12 +210,71 @@ export default function ExploreScreen() {
               <Text style={styles.modalSanskrit}>{selectedShloka.sanskrit}</Text>
               <Text style={styles.modalTranslit}>{selectedShloka.transliteration}</Text>
               <View style={styles.modalDivider} />
-              <Text style={styles.modalLabel}>ENGLISH</Text>
-              <Text style={styles.modalEnglish}>{selectedShloka.english}</Text>
-              {!!selectedShloka.hindi && (
+
+              <VerseAudio shloka={selectedShloka} onUpgrade={() => setShowPremium(true)} />
+
+              {/* Word by Word — free for curated verses, premium gate otherwise */}
+              {Array.isArray(selectedShloka.wordByWord) && selectedShloka.wordByWord.length > 0 ? (
                 <>
-                  <Text style={styles.modalLabel}>HINDI</Text>
-                  <Text style={styles.modalHindi}>{selectedShloka.hindi}</Text>
+                  <Text style={styles.modalLabel}>{hiFirst ? 'शब्दार्थ · WORD BY WORD' : 'WORD BY WORD · शब्दार्थ'}</Text>
+                  <View style={styles.wbwGrid}>
+                    {selectedShloka.wordByWord.map((w, i) => {
+                      const en = w.en != null ? w.en : (w.m != null ? w.m : '');
+                      const hi = w.hi != null ? w.hi : '';
+                      return (
+                        <View key={i} style={styles.wbwChip}>
+                          <Text style={styles.wbwWord}>{w.w}</Text>
+                          {hiFirst ? (
+                            <>
+                              {!!hi && <Text style={styles.wbwHi}>{hi}</Text>}
+                              {!!en && <Text style={styles.wbwEn}>{en}</Text>}
+                            </>
+                          ) : (
+                            <>
+                              {!!en && <Text style={styles.wbwEn}>{en}</Text>}
+                              {!!hi && <Text style={styles.wbwHi}>{hi}</Text>}
+                            </>
+                          )}
+                        </View>
+                      );
+                    })}
+                  </View>
+                </>
+              ) : isPremium ? (
+                <>
+                  <Text style={styles.modalLabel}>{hiFirst ? 'शब्दार्थ · WORD BY WORD' : 'WORD BY WORD · शब्दार्थ'}</Text>
+                  <View style={styles.applicationBox}>
+                    <Text style={styles.applicationText}>{hiFirst
+                      ? 'इस श्लोक का विस्तृत शब्दार्थ तैयार किया जा रहा है। तब तक नीचे पूरा अनुवाद उपलब्ध है। 🙏'
+                      : 'A detailed word-by-word breakdown for this verse is being prepared. The full translation is available below. 🙏'}</Text>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.modalLabel}>{hiFirst ? 'शब्दार्थ · WORD BY WORD' : 'WORD BY WORD · शब्दार्थ'}</Text>
+                  <TouchableOpacity style={styles.lockCard} activeOpacity={0.85} onPress={() => setShowPremium(true)}>
+                    <Text style={styles.lockIcon}>🔒</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.lockTitle}>{hiFirst ? 'हर शब्द का अर्थ अनलॉक करें' : 'Unlock word-by-word meaning'}</Text>
+                      <Text style={styles.lockSub}>{hiFirst
+                        ? 'सभी 700 श्लोकों का संस्कृत-शब्दार्थ (हिंदी + अंग्रेज़ी)।'
+                        : 'Sanskrit word meanings (Hindi + English) for all 700 verses.'}</Text>
+                      <Text style={styles.lockCta}>{hiFirst ? 'प्रीमियम लें · ₹199/वर्ष →' : 'Go Premium · ₹199/year →'}</Text>
+                    </View>
+                  </TouchableOpacity>
+                </>
+              )}
+
+              <Text style={styles.modalLabel}>{hiFirst ? 'अनुवाद · TRANSLATION' : 'TRANSLATION · अनुवाद'}</Text>
+              {hiFirst ? (
+                <>
+                  {!!selectedShloka.hindi && <Text style={styles.modalHindi}>{selectedShloka.hindi}</Text>}
+                  {!!selectedShloka.english && <Text style={styles.modalEnglish}>{selectedShloka.english}</Text>}
+                </>
+              ) : (
+                <>
+                  {!!selectedShloka.english && <Text style={styles.modalEnglish}>{selectedShloka.english}</Text>}
+                  {!!selectedShloka.hindi && <Text style={styles.modalHindi}>{selectedShloka.hindi}</Text>}
                 </>
               )}
               {!!selectedShloka.context && (
@@ -247,6 +310,8 @@ export default function ExploreScreen() {
           </SafeAreaView>
         )}
       </Modal>
+
+      <PremiumSheet visible={showPremium} onClose={() => setShowPremium(false)} />
     </SafeAreaView>
   );
 }
@@ -539,5 +604,67 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.text,
     lineHeight: 22,
+  },
+  // Word-by-word
+  wbwGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 6,
+  },
+  wbwChip: {
+    backgroundColor: '#FEF3E2',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    minWidth: 96,
+  },
+  wbwWord: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.primary,
+    marginBottom: 3,
+  },
+  wbwEn: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    lineHeight: 17,
+  },
+  wbwHi: {
+    fontSize: 13,
+    color: Colors.textMuted,
+    lineHeight: 18,
+  },
+  // Premium lock card
+  lockCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#FFF6E6',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#F2C879',
+    marginTop: 6,
+  },
+  lockIcon: { fontSize: 26 },
+  lockTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.text,
+    marginBottom: 3,
+  },
+  lockSub: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    lineHeight: 17,
+    marginBottom: 6,
+  },
+  lockCta: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.primaryDark,
   },
 });

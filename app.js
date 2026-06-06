@@ -20,8 +20,103 @@ const KV_CONFIG = {
     gita:    'spreadgita@upi',
     culture: 'dharmamovement@upi',
   },
+  premiumUpi:   'krishnaverse@upi', // TODO: set real UPI ID for ₹199/yr Premium
+  premiumPrice: 199,                // ₹/year
 };
 window.KV_CONFIG = KV_CONFIG;
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  🔊  CHAPTER_AUDIO — authentic recitation (Premium feature)   ║
+// ║  Paste a DIRECT, streamable audio URL (.mp3/.ogg) for each    ║
+// ║  chapter. Leave '' for chapters you haven't added yet —       ║
+// ║  the app shows a friendly "coming soon" for those.            ║
+// ║                                                                ║
+// ║  Suggested authentic source: Internet Archive item            ║
+// ║  'SrimadBhagavadGita_201712' (chanting by T. S. Ranganathan). ║
+// ║  Open the item's page, copy each chapter's direct file link,  ║
+// ║  and CONFIRM the licence permits embedding before publishing. ║
+// ║  Direct-link form: https://archive.org/download/<id>/<file>   ║
+// ╚══════════════════════════════════════════════════════════════╝
+const CHAPTER_AUDIO = {
+  1: '',  2: '',  3: '',  4: '',  5: '',  6: '',
+  7: '',  8: '',  9: '', 10: '', 11: '', 12: '',
+  13: '', 14: '', 15: '', 16: '', 17: '', 18: '',
+};
+window.CHAPTER_AUDIO = CHAPTER_AUDIO;
+
+// ── Text-to-Speech (free read-aloud) ───────────────────────
+// First principles: the elder audience benefits most from HEARING the
+// verse and its meaning. Device TTS needs no network, no licence, and
+// covers all 700 verses — an honest, shippable accessibility baseline.
+// Authentic human chanting is the Premium upgrade (CHAPTER_AUDIO).
+const TTS = {
+  supported: typeof window !== 'undefined' && 'speechSynthesis' in window,
+  speakingId: null,
+};
+
+function ttsPickVoice(langPref) {
+  if (!TTS.supported) return null;
+  const voices = window.speechSynthesis.getVoices() || [];
+  const want = langPref === 'hi' ? 'hi' : 'en';
+  return voices.find(v => v.lang && v.lang.toLowerCase().startsWith(want))
+      || voices.find(v => v.lang && v.lang.toLowerCase().startsWith('hi'))
+      || voices[0] || null;
+}
+
+// Read the verse aloud. For Hindi readers: transliteration (verse sound) +
+// Hindi meaning. Otherwise: transliteration + English meaning.
+function speakShloka(shlokaId, btn) {
+  if (!TTS.supported) { showToast('Read-aloud is not supported on this device'); return; }
+  const synth = window.speechSynthesis;
+  // Toggle off if this verse is already speaking.
+  if (TTS.speakingId === shlokaId) { synth.cancel(); TTS.speakingId = null; refreshTtsButtons(); return; }
+  synth.cancel();
+  const shloka = getShlokaById(shlokaId);
+  if (!shloka) return;
+  const hi = STATE.language === 'hi';
+  const parts = [];
+  if (shloka.transliteration) parts.push({ text: shloka.transliteration.replace(/\n/g, ', '), lang: 'hi' });
+  if (hi && shloka.hindi) parts.push({ text: shloka.hindi, lang: 'hi' });
+  else if (shloka.english) parts.push({ text: shloka.english, lang: 'en' });
+
+  let i = 0;
+  const speakNext = () => {
+    if (i >= parts.length) { TTS.speakingId = null; refreshTtsButtons(); return; }
+    const p = parts[i++];
+    const u = new SpeechSynthesisUtterance(p.text);
+    const voice = ttsPickVoice(p.lang);
+    if (voice) u.voice = voice;
+    u.lang = p.lang === 'hi' ? 'hi-IN' : 'en-IN';
+    u.rate = 0.92;
+    u.onend = speakNext;
+    u.onerror = () => { TTS.speakingId = null; refreshTtsButtons(); };
+    synth.speak(u);
+  };
+  TTS.speakingId = shlokaId;
+  refreshTtsButtons();
+  speakNext();
+}
+
+// Keep every visible read-aloud button label in sync with TTS state.
+function refreshTtsButtons() {
+  document.querySelectorAll('[data-tts-id]').forEach(b => {
+    const on = b.getAttribute('data-tts-id') === TTS.speakingId;
+    b.classList.toggle('playing', on);
+    const label = b.querySelector('.tts-label');
+    if (label) label.textContent = on
+      ? (STATE.language === 'hi' ? 'रोकें' : 'Stop')
+      : (STATE.language === 'hi' ? 'सुनें' : 'Listen');
+  });
+}
+window.speakShloka = speakShloka;
+
+// Stop any narration when leaving a verse / closing modals.
+function stopTts() {
+  if (TTS.supported) { window.speechSynthesis.cancel(); }
+  TTS.speakingId = null;
+  refreshTtsButtons();
+}
+window.stopTts = stopTts;
 
 // ── State ──────────────────────────────────────────────────
 const STATE = {
@@ -40,6 +135,18 @@ const STATE = {
   chatHistory: [],
   initialized: false,
   userId: null,        // Firebase uid when signed in (for cloud sync)
+  isPremium: false,    // ₹199/yr — unlocks word-by-word for non-curated verses
+  // Japa (digital mala): one round = 108 beads. todayCount resets each day;
+  // totalCount is lifetime. Rounds are derived (count / 108).
+  japa: {
+    mantra: 'radhe',   // key into JAPA_MANTRAS
+    customText: '',
+    todayCount: 0,
+    totalCount: 0,
+    lastDate: null,    // 'YYYY-MM-DD' — for the daily reset
+    sound: true,
+    haptic: true,
+  },
 };
 
 // ── Persistence ────────────────────────────────────────────
@@ -52,6 +159,8 @@ function saveState() {
     journal: STATE.journal,
     moodHistory: STATE.moodHistory,
     streak: STATE.streak,
+    isPremium: STATE.isPremium,
+    japa: STATE.japa,
   };
   try { localStorage.setItem('krishna_guide_v2', JSON.stringify(data)); } catch(e) {}
   // Mirror to the cloud (debounced) when signed in.
@@ -72,6 +181,8 @@ function scheduleCloudSave() {
       journal: STATE.journal,
       moodHistory: STATE.moodHistory,
       streak: STATE.streak,
+      isPremium: STATE.isPremium,
+      japa: STATE.japa,
     });
   }, 1200);
 }
@@ -112,6 +223,24 @@ function mergeCloudIntoState(cloud) {
   }
   if (typeof cloud.darkMode === 'boolean') STATE.darkMode = cloud.darkMode;
   if (cloud.language) STATE.language = cloud.language;
+  // Premium entitlement: once true anywhere, it stays true (cloud is source of truth).
+  if (cloud.isPremium === true) STATE.isPremium = true;
+  // Japa: keep the larger lifetime total; cloud preferences win for mantra/toggles.
+  if (cloud.japa && typeof cloud.japa === 'object') {
+    const lj = STATE.japa || {};
+    const cj = cloud.japa;
+    STATE.japa = {
+      mantra: cj.mantra || lj.mantra || 'radhe',
+      customText: cj.customText != null ? cj.customText : (lj.customText || ''),
+      totalCount: Math.max(lj.totalCount || 0, cj.totalCount || 0),
+      // Today's tally belongs to whichever device logged today most recently.
+      todayCount: (cj.lastDate && cj.lastDate >= (lj.lastDate || ''))
+        ? (cj.todayCount || 0) : (lj.todayCount || 0),
+      lastDate: (cj.lastDate && cj.lastDate >= (lj.lastDate || '')) ? cj.lastDate : (lj.lastDate || null),
+      sound: typeof cj.sound === 'boolean' ? cj.sound : (lj.sound !== false),
+      haptic: typeof cj.haptic === 'boolean' ? cj.haptic : (lj.haptic !== false),
+    };
+  }
 }
 
 // Called by auth.js when a user signs in.
@@ -150,6 +279,10 @@ function loadState() {
     STATE.journal = d.journal || [];
     STATE.moodHistory = d.moodHistory || [];
     STATE.streak = d.streak || { current: 0, best: 0, lastDate: null };
+    STATE.isPremium = d.isPremium === true;
+    if (d.japa && typeof d.japa === 'object') {
+      STATE.japa = Object.assign({}, STATE.japa, d.japa);
+    }
   } catch(e) {}
 }
 
@@ -745,17 +878,57 @@ function openShlokaDetail(shloka) {
   const langContent = STATE.language === 'hi' ? shloka.hindi :
                       STATE.language === 'sa' ? shloka.transliteration : shloka.english;
 
-  const wordByWordHTML = (Array.isArray(shloka.wordByWord) && shloka.wordByWord.length) ? `
-    <div class="sd-section-label">Word by Word</div>
+  // Hindi-first when the user reads in Hindi; otherwise English-first.
+  const hiFirst = STATE.language === 'hi';
+
+  // Bilingual per-word meaning. Falls back to legacy {m} if en/hi absent.
+  const wordMeaningHTML = (w) => {
+    const en = w.en != null ? w.en : (w.m != null ? w.m : '');
+    const hi = w.hi != null ? w.hi : '';
+    const enLine = en ? `<span class="sdw-meaning sdw-en">${en}</span>` : '';
+    const hiLine = hi ? `<span class="sdw-meaning sdw-hi">${hi}</span>` : '';
+    return hiFirst ? (hiLine + enLine) : (enLine + hiLine);
+  };
+
+  const hasWBW = Array.isArray(shloka.wordByWord) && shloka.wordByWord.length;
+
+  let wordByWordHTML = '';
+  if (hasWBW) {
+    // Curated (free) verse — full bilingual word-by-word.
+    wordByWordHTML = `
+    <div class="sd-section-label">${hiFirst ? 'शब्दार्थ (Word by Word)' : 'Word by Word · शब्दार्थ'}</div>
     <div class="sd-word-grid">
       ${shloka.wordByWord.map(w => `
         <div class="sd-word-chip">
           <span class="sdw-word">${w.w}</span>
-          <span class="sdw-meaning">${w.m}</span>
+          ${wordMeaningHTML(w)}
         </div>
       `).join('')}
-    </div>
-  ` : '';
+    </div>`;
+  } else if (STATE.isPremium) {
+    // Premium member, but this non-curated verse has no authored word-by-word yet.
+    wordByWordHTML = `
+    <div class="sd-section-label">${hiFirst ? 'शब्दार्थ (Word by Word)' : 'Word by Word · शब्दार्थ'}</div>
+    <div class="sd-box" style="border-left-color:var(--gold)">
+      <p>${hiFirst
+        ? 'इस श्लोक का विस्तृत शब्दार्थ तैयार किया जा रहा है। तब तक नीचे पूरा अनुवाद उपलब्ध है। 🙏'
+        : 'A detailed word-by-word breakdown for this verse is being prepared. The full translation is available below. 🙏'}</p>
+    </div>`;
+  } else {
+    // Free user on a non-curated verse — locked upsell card.
+    wordByWordHTML = `
+    <div class="sd-section-label">${hiFirst ? 'शब्दार्थ (Word by Word)' : 'Word by Word · शब्दार्थ'}</div>
+    <div class="sd-premium-lock" onclick="requestPremiumUpgrade()">
+      <div class="sd-lock-icon">🔒</div>
+      <div class="sd-lock-body">
+        <div class="sd-lock-title">${hiFirst ? 'हर शब्द का अर्थ अनलॉक करें' : 'Unlock word-by-word meaning'}</div>
+        <div class="sd-lock-sub">${hiFirst
+          ? 'सभी 700 श्लोकों का संस्कृत-शब्दार्थ (हिंदी + अंग्रेज़ी) — KrishnaVerse Premium में।'
+          : 'Sanskrit word meanings (Hindi + English) for all 700 verses — with KrishnaVerse Premium.'}</div>
+        <div class="sd-lock-cta">${hiFirst ? 'प्रीमियम लें · ₹199/वर्ष' : 'Go Premium · ₹199/year'} →</div>
+      </div>
+    </div>`;
+  }
 
   // Rich teaching fields exist only for curated verses — render them only when present.
   const contextHTML = shloka.context ? `
@@ -770,6 +943,41 @@ function openShlokaDetail(shloka) {
       <div class="sd-section-label">💡 Life Application</div>
       <div class="sd-box" style="border-left-color:var(--gold)"><p>${shloka.lifeApplication}</p></div>` : '';
 
+  // ── Audio: free TTS read-aloud + Premium authentic chapter recitation ──
+  const ttsBtnHTML = TTS.supported ? `
+    <button class="sd-listen-btn" data-tts-id="${shloka.id}" onclick="speakShloka('${shloka.id}', this)">
+      <span class="sd-listen-ico">🔊</span> <span class="tts-label">${hiFirst ? 'सुनें' : 'Listen'}</span>
+    </button>` : '';
+
+  const chapterUrl = (window.CHAPTER_AUDIO && window.CHAPTER_AUDIO[shloka.chapter]) || '';
+  let chapterAudioHTML = '';
+  if (STATE.isPremium) {
+    chapterAudioHTML = chapterUrl ? `
+      <div class="sd-audio-premium">
+        <div class="sd-audio-title">${hiFirst ? `अध्याय ${shloka.chapter} का पाठ` : `Chapter ${shloka.chapter} recitation`} 🪔</div>
+        <audio controls preload="none" style="width:100%" src="${chapterUrl}"></audio>
+      </div>` : `
+      <div class="sd-box" style="border-left-color:var(--gold)"><p>${hiFirst
+        ? `अध्याय ${shloka.chapter} का प्रामाणिक पाठ शीघ्र जोड़ा जाएगा। 🙏`
+        : `Authentic recitation for Chapter ${shloka.chapter} is being added soon. 🙏`}</p></div>`;
+  } else {
+    chapterAudioHTML = `
+      <div class="sd-premium-lock" onclick="requestPremiumUpgrade()">
+        <div class="sd-lock-icon">🎧</div>
+        <div class="sd-lock-body">
+          <div class="sd-lock-title">${hiFirst ? 'प्रामाणिक पाठ सुनें' : 'Listen to authentic recitation'}</div>
+          <div class="sd-lock-sub">${hiFirst
+            ? 'शुद्ध संस्कृत उच्चारण में पूरे अध्याय का पाठ — KrishnaVerse Premium में।'
+            : 'Full-chapter chanting in pure Sanskrit pronunciation — with KrishnaVerse Premium.'}</div>
+          <div class="sd-lock-cta">${hiFirst ? 'प्रीमियम लें · ₹199/वर्ष' : 'Go Premium · ₹199/year'} →</div>
+        </div>
+      </div>`;
+  }
+  const audioHTML = `
+      <div class="sd-section-label">${hiFirst ? 'श्रवण · Audio' : 'Audio · श्रवण'}</div>
+      ${ttsBtnHTML}
+      ${chapterAudioHTML}`;
+
   document.getElementById('shlokaDetailBody').innerHTML = `
     <div style="padding-top:8px">
       <span class="sd-ref">BG ${shloka.chapter}.${shloka.verse}</span>
@@ -779,11 +987,16 @@ function openShlokaDetail(shloka) {
       <div class="sd-sanskrit">${shloka.sanskrit}</div>
       <div class="sd-translit">${shloka.transliteration}</div>
 
+      ${audioHTML}
+
       ${wordByWordHTML}
 
-      <div class="sd-section-label">${STATE.language === 'hi' ? 'अनुवाद' : 'Translation'}</div>
-      ${STATE.language !== 'en' && shloka.hindi ? `<div class="sd-hindi" style="margin-bottom:8px">${shloka.hindi}</div>` : ''}
-      <div class="sd-translation">${shloka.english}</div>
+      <div class="sd-section-label">${hiFirst ? 'अनुवाद · Translation' : 'Translation · अनुवाद'}</div>
+      ${(() => {
+        const hi = shloka.hindi ? `<div class="sd-translation sd-trans-hi" lang="hi">${shloka.hindi}</div>` : '';
+        const en = shloka.english ? `<div class="sd-translation sd-trans-en">${shloka.english}</div>` : '';
+        return hiFirst ? (hi + en) : (en + hi);
+      })()}
 
       ${contextHTML}
       ${explanationHTML}
@@ -816,6 +1029,7 @@ function openShlokaDetail(shloka) {
 
 function closeShlokaModal(e) {
   if (!e || e.target === document.getElementById('shlokaModal')) {
+    stopTts();
     document.getElementById('shlokaModal').classList.add('hidden');
   }
 }
@@ -1371,6 +1585,7 @@ function escapeHtml(text) {
 // Keyboard escape
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
+    stopTts();
     document.querySelectorAll('.modal-overlay:not(.hidden)').forEach(m => m.classList.add('hidden'));
   }
 });
@@ -1655,6 +1870,397 @@ function placeOrder(productId, waLink) {
 }
 window.placeOrder = placeOrder;
 
+// ── Premium (₹199/yr) upgrade ──────────────────────────────
+// First principles: the value the user pays for is word-by-word Sanskrit
+// meaning across ALL 700 verses (the 23 curated ones are free). Payment
+// is handled out-of-band via UPI/WhatsApp; we record intent and unlock
+// optimistically so the experience is smooth, with cloud as source of truth.
+function requestPremiumUpgrade() {
+  const hiFirst = STATE.language === 'hi';
+  const price = (KV_CONFIG && KV_CONFIG.premiumPrice) ? KV_CONFIG.premiumPrice : 199;
+  const upi = (KV_CONFIG && KV_CONFIG.premiumUpi) ? KV_CONFIG.premiumUpi : '';
+  const waNum = (KV_CONFIG && KV_CONFIG.shopWhatsApp) ? KV_CONFIG.shopWhatsApp : '';
+  const waBase = waNum ? `https://wa.me/${waNum}` : `https://wa.me/`;
+
+  let modal = document.getElementById('premiumModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'premiumModal';
+    modal.className = 'modal-overlay hidden';
+    modal.setAttribute('onclick', 'closePremiumModal(event)');
+    document.body.appendChild(modal);
+  }
+
+  const benefits = hiFirst
+    ? ['सभी 700 श्लोकों का शब्द-दर-शब्द अर्थ', 'हिंदी + अंग्रेज़ी, दोनों भाषाओं में', 'भविष्य के सभी अपडेट शामिल', 'गौ-सेवा व प्रचार में योगदान']
+    : ['Word-by-word meaning for all 700 verses', 'Both Hindi & English, side by side', 'All future updates included', 'Supports Gita propagation & go-seva'];
+
+  // Razorpay UPI Checkout is the primary path when the user is signed in and
+  // Cloud Functions + the Razorpay SDK are available. WhatsApp/UPI stay as a
+  // manual fallback so the upgrade never hits a dead end.
+  const canRazorpay = !!(STATE.userId && window.kvFunctions && typeof Razorpay !== 'undefined');
+  const rzpBtn = canRazorpay ? `
+      <button class="pm-rzp-btn" id="rzpPayBtn" type="button" onclick="payWithRazorpay()">
+        ${hiFirst ? `UPI से ₹${price} भुगतान करें` : `Pay ₹${price} with UPI`}
+      </button>
+      <div class="pr-or">${hiFirst ? 'या' : 'or'}</div>` : '';
+
+  modal.innerHTML = `
+    <div class="modal-card premium-card" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="closePremiumModal()" aria-label="Close">×</button>
+      <div class="pr-crown">🪔</div>
+      <div class="pr-title">${hiFirst ? 'KrishnaVerse प्रीमियम' : 'KrishnaVerse Premium'}</div>
+      <div class="pr-price">₹${price}<span>/${hiFirst ? 'वर्ष' : 'year'}</span></div>
+      <ul class="pr-benefits">
+        ${benefits.map(b => `<li>✓ ${b}</li>`).join('')}
+      </ul>
+      ${rzpBtn}
+      ${upi ? `
+        <div class="pr-upi-label">${hiFirst ? 'UPI से भुगतान करें' : 'Pay via UPI'}</div>
+        <div class="pr-upi">${upi}</div>
+        <button class="dm-copy-btn" onclick="copyUpiId('${upi}')">📋 ${hiFirst ? 'UPI ID कॉपी करें' : 'Copy UPI ID'}</button>
+      ` : ''}
+      <button class="pm-wa-btn" type="button" onclick="proceedPremium()">
+        ${hiFirst ? `WhatsApp पर प्रीमियम लें · ₹${price}/वर्ष` : `Get Premium on WhatsApp · ₹${price}/yr`}
+      </button>
+      <div class="pr-note">${hiFirst
+        ? 'भुगतान की पुष्टि के बाद आपका खाता अनलॉक कर दिया जाएगा। 🙏'
+        : 'Your account is unlocked once payment is confirmed. 🙏'}</div>
+    </div>`;
+  modal.classList.remove('hidden');
+}
+
+// Razorpay UPI-only Checkout. First principles: the client never decides
+// entitlement — it asks the server to mint an order, completes the UPI
+// payment, then asks the server to VERIFY the signature and unlock. The
+// webhook is the backstop if the device drops off after paying.
+async function payWithRazorpay() {
+  const hi = STATE.language === 'hi';
+  const price = (KV_CONFIG && KV_CONFIG.premiumPrice) ? KV_CONFIG.premiumPrice : 199;
+  if (!STATE.userId || !window.kvFunctions) { showToast(hi ? 'कृपया पहले साइन इन करें' : 'Please sign in first'); return; }
+  if (typeof Razorpay === 'undefined') { showToast(hi ? 'भुगतान लोड नहीं हो सका' : 'Payment could not load'); return; }
+  const btn = document.getElementById('rzpPayBtn');
+  const setBtn = (txt, dis) => { if (btn) { btn.textContent = txt; btn.disabled = dis; } };
+  setBtn(hi ? 'लोड हो रहा है…' : 'Loading…', true);
+  try {
+    const createOrder = window.kvFunctions.httpsCallable('createRazorpayOrder');
+    const res = await createOrder({});
+    const d = (res && res.data) || {};
+    if (!d.orderId || !d.keyId) throw new Error('order failed');
+    const user = window.__kvUser || {};
+    const rzp = new Razorpay({
+      key: d.keyId,
+      order_id: d.orderId,
+      amount: d.amount,
+      currency: d.currency || 'INR',
+      name: 'KrishnaVerse',
+      description: hi ? 'प्रीमियम (वार्षिक)' : 'Premium (Annual)',
+      image: 'eye.png',
+      prefill: { name: user.displayName || '', email: user.email || '' },
+      theme: { color: '#E8690A' },
+      // UPI-only: disable every other method.
+      method: { upi: true, card: false, netbanking: false, wallet: false, emi: false, paylater: false },
+      handler: async function (resp) {
+        try {
+          const verify = window.kvFunctions.httpsCallable('verifyRazorpayPayment');
+          await verify({
+            orderId: resp.razorpay_order_id,
+            paymentId: resp.razorpay_payment_id,
+            signature: resp.razorpay_signature,
+          });
+          STATE.isPremium = true;
+          saveState();
+          closePremiumModal();
+          if (typeof renderHome === 'function') renderHome();
+          showToast(hi ? '🪔 प्रीमियम सक्रिय! हरे कृष्ण' : '🪔 Premium activated! Hare Krishna');
+        } catch (e) {
+          showToast(hi ? 'सत्यापन विफल — कृपया सहायता से संपर्क करें' : 'Verification failed — please contact support');
+        }
+      },
+      modal: { ondismiss: function () { setBtn(hi ? `UPI से ₹${price} भुगतान करें` : `Pay ₹${price} with UPI`, false); } },
+    });
+    rzp.on('payment.failed', function () { showToast(hi ? 'भुगतान असफल रहा' : 'Payment failed. Please try again.'); });
+    rzp.open();
+    setBtn(hi ? `UPI से ₹${price} भुगतान करें` : `Pay ₹${price} with UPI`, false);
+  } catch (e) {
+    setBtn(hi ? `UPI से ₹${price} भुगतान करें` : `Pay ₹${price} with UPI`, false);
+    showToast(hi ? 'भुगतान शुरू नहीं हो सका' : 'Could not start payment. Please try again.');
+  }
+}
+window.payWithRazorpay = payWithRazorpay;
+window.requestPremiumUpgrade = requestPremiumUpgrade;
+
+function proceedPremium() {
+  const price = (KV_CONFIG && KV_CONFIG.premiumPrice) ? KV_CONFIG.premiumPrice : 199;
+  const upi = (KV_CONFIG && KV_CONFIG.premiumUpi) ? KV_CONFIG.premiumUpi : '';
+  const waNum = (KV_CONFIG && KV_CONFIG.shopWhatsApp) ? KV_CONFIG.shopWhatsApp : '';
+  const waBase = waNum ? `https://wa.me/${waNum}` : `https://wa.me/`;
+  // Best-effort record of the purchase intent.
+  if (window.__kvCloud && typeof window.__kvCloud.createOrder === 'function') {
+    window.__kvCloud.createOrder({
+      userId: STATE.userId || null,
+      items: [{ id: 'premium-annual', name: 'KrishnaVerse Premium (Annual)', price: '₹' + price, category: 'subscription' }],
+      status: 'pending',
+      channel: 'whatsapp',
+    });
+  }
+  const msg = encodeURIComponent(`Jai Shri Krishna! 🙏\n\nI want *KrishnaVerse Premium* (word-by-word for all 700 verses) for ₹${price}/year.${upi ? `\n\nUPI: ${upi}` : ''}\n\nHare Krishna 🪔`);
+  window.open(`${waBase}?text=${msg}`, '_blank', 'noopener');
+  showToast(STATE.language === 'hi' ? 'जय श्री कृष्ण! WhatsApp खुल रहा है…' : 'Jai Shri Krishna! Opening WhatsApp...');
+}
+window.proceedPremium = proceedPremium;
+
+function closePremiumModal(e) {
+  const m = document.getElementById('premiumModal');
+  if (m && (!e || e.target === m)) m.classList.add('hidden');
+}
+window.closePremiumModal = closePremiumModal;
+
+// ═══════════════════════════════════════════════════════════
+//  Japa Mala — digital chant counter (one round = 108 beads)
+//  First principles: japa is a count + a focus aid. The screen
+//  should do exactly two things well — make each count effortless
+//  (one big tap, instant feedback) and honour the sacred unit of
+//  108 with a visible round and a small celebration at completion.
+// ═══════════════════════════════════════════════════════════
+const JAPA_MALA = 108;
+const JAPA_MANTRAS = {
+  radhe:    { dev: 'राधे राधे',                 tr: 'Rādhe Rādhe',                  en: 'Radha Naam' },
+  hare:     { dev: 'हरे कृष्ण हरे कृष्ण',        tr: 'Hare Krishna Mahā-mantra',     en: 'Hare Krishna' },
+  vasudev:  { dev: 'ॐ नमो भगवते वासुदेवाय',    tr: 'Om Namo Bhagavate Vāsudevāya', en: 'Dvādaśākṣarī' },
+  sharanam: { dev: 'श्री कृष्ण शरणं मम',        tr: 'Śrī Kṛṣṇa Śaraṇaṁ Mama',       en: 'Sharanam' },
+  custom:   { dev: '', tr: '', en: 'Custom' },
+};
+
+function japaTodayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function japaEnsureToday() {
+  if (!STATE.japa) STATE.japa = { mantra:'radhe', customText:'', todayCount:0, totalCount:0, lastDate:null, sound:true, haptic:true };
+  const today = japaTodayKey();
+  if (STATE.japa.lastDate !== today) {
+    STATE.japa.todayCount = 0;
+    STATE.japa.lastDate = today;
+  }
+}
+function japaMantraText() {
+  const j = STATE.japa;
+  if (j.mantra === 'custom') {
+    const t = (j.customText || '').trim();
+    return { dev: t || (STATE.language === 'hi' ? 'अपना मंत्र लिखें' : 'Enter your mantra'), tr: '', en: 'Custom' };
+  }
+  return JAPA_MANTRAS[j.mantra] || JAPA_MANTRAS.radhe;
+}
+
+// Soft tick via Web Audio (no asset needed); separate chime on mala complete.
+let __japaAudioCtx = null;
+function japaTone(freq, durMs, type) {
+  if (!STATE.japa || !STATE.japa.sound) return;
+  try {
+    __japaAudioCtx = __japaAudioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = __japaAudioCtx;
+    if (ctx.state === 'suspended') ctx.resume();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + durMs/1000);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(); osc.stop(ctx.currentTime + durMs/1000 + 0.02);
+  } catch (e) {}
+}
+function japaBuzz(ms) {
+  if (STATE.japa && STATE.japa.haptic && navigator.vibrate) { try { navigator.vibrate(ms); } catch(e){} }
+}
+
+function openJapaModal() {
+  japaEnsureToday();
+  let modal = document.getElementById('japaModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'japaModal';
+    modal.className = 'modal-overlay japa-overlay hidden';
+    modal.setAttribute('onclick', 'closeJapaModal(event)');
+    document.body.appendChild(modal);
+  }
+  const hi = STATE.language === 'hi';
+  const presets = ['radhe','hare','vasudev','sharanam','custom'];
+  const chips = presets.map(k => {
+    const m = JAPA_MANTRAS[k];
+    const label = k === 'custom' ? (hi ? 'अपना मंत्र' : 'Custom') : m.dev;
+    return `<button class="japa-chip ${STATE.japa.mantra===k?'active':''}" onclick="japaSetMantra('${k}')">${label}</button>`;
+  }).join('');
+
+  modal.innerHTML = `
+    <div class="japa-card" onclick="event.stopPropagation()">
+      <button class="modal-close japa-close" onclick="closeJapaModal()" aria-label="Close">×</button>
+      <div class="japa-title">${hi ? '📿 जप माला' : '📿 Japa Mala'}</div>
+
+      <div class="japa-mantra-row">${chips}</div>
+      <div id="japaCustomWrap" class="japa-custom-wrap ${STATE.japa.mantra==='custom'?'':'hidden'}">
+        <input id="japaCustomInput" class="japa-custom-input" type="text" maxlength="60"
+          placeholder="${hi ? 'अपना मंत्र यहाँ लिखें…' : 'Type your mantra…'}"
+          value="${(STATE.japa.customText||'').replace(/"/g,'&quot;')}"
+          oninput="japaSetCustom(this.value)">
+      </div>
+
+      <div class="japa-bead-wrap" onclick="japaCount()" role="button" tabindex="0"
+           onkeydown="if(event.key===' '||event.key==='Enter'){event.preventDefault();japaCount();}">
+        <svg class="japa-ring" viewBox="0 0 280 280" aria-hidden="true">
+          <circle class="japa-ring-bg" cx="140" cy="140" r="125"></circle>
+          <circle id="japaRingFg" class="japa-ring-fg" cx="140" cy="140" r="125"
+                  transform="rotate(-90 140 140)"></circle>
+        </svg>
+        <div class="japa-bead">
+          <div class="japa-mantra-dev" id="japaMantraDev"></div>
+          <div class="japa-mantra-tr" id="japaMantraTr"></div>
+          <div class="japa-bead-count" id="japaBeadCount">0</div>
+          <div class="japa-bead-of">${hi ? 'में से 108' : 'of 108'}</div>
+          <div class="japa-tap-hint">${hi ? 'जप करने के लिए स्पर्श करें' : 'tap to chant'}</div>
+        </div>
+      </div>
+
+      <div class="japa-stats">
+        <div class="japa-stat"><span class="japa-stat-num" id="japaRoundsToday">0</span><span class="japa-stat-lbl">${hi ? 'आज की मालाएँ' : 'Rounds today'}</span></div>
+        <div class="japa-stat"><span class="japa-stat-num" id="japaToday">0</span><span class="japa-stat-lbl">${hi ? 'आज के जप' : 'Today'}</span></div>
+        <div class="japa-stat"><span class="japa-stat-num" id="japaTotal">0</span><span class="japa-stat-lbl">${hi ? 'कुल जप' : 'Lifetime'}</span></div>
+      </div>
+
+      <div class="japa-controls">
+        <button class="japa-ctrl" onclick="japaToggleSound()" id="japaSoundBtn"></button>
+        <button class="japa-ctrl" onclick="japaToggleHaptic()" id="japaHapticBtn"></button>
+        <button class="japa-ctrl japa-undo" onclick="japaUndo()">↩︎ ${hi ? 'पूर्ववत' : 'Undo'}</button>
+        <button class="japa-ctrl japa-reset" onclick="japaResetToday()">⟳ ${hi ? 'रीसेट' : 'Reset'}</button>
+      </div>
+    </div>`;
+  modal.classList.remove('hidden');
+  renderJapaModal();
+}
+window.openJapaModal = openJapaModal;
+
+function renderJapaModal() {
+  const modal = document.getElementById('japaModal');
+  if (!modal || modal.classList.contains('hidden')) return;
+  japaEnsureToday();
+  const j = STATE.japa;
+  const inRound = j.todayCount % JAPA_MALA;
+  const roundsToday = Math.floor(j.todayCount / JAPA_MALA);
+  const m = japaMantraText();
+
+  const devEl = document.getElementById('japaMantraDev');
+  const trEl  = document.getElementById('japaMantraTr');
+  if (devEl) devEl.textContent = m.dev;
+  if (trEl)  trEl.textContent = m.tr || '';
+  const bc = document.getElementById('japaBeadCount'); if (bc) bc.textContent = inRound;
+  const rt = document.getElementById('japaRoundsToday'); if (rt) rt.textContent = roundsToday;
+  const td = document.getElementById('japaToday'); if (td) td.textContent = j.todayCount;
+  const tt = document.getElementById('japaTotal'); if (tt) tt.textContent = j.totalCount;
+
+  const ring = document.getElementById('japaRingFg');
+  if (ring) {
+    const r = 125, circ = 2 * Math.PI * r;
+    const frac = inRound === 0 && j.todayCount > 0 ? 1 : inRound / JAPA_MALA;
+    ring.style.strokeDasharray = `${circ}`;
+    ring.style.strokeDashoffset = `${circ * (1 - frac)}`;
+  }
+  const sBtn = document.getElementById('japaSoundBtn');
+  if (sBtn) sBtn.textContent = (j.sound ? '🔔' : '🔕') + (STATE.language==='hi' ? ' ध्वनि' : ' Sound');
+  const hBtn = document.getElementById('japaHapticBtn');
+  if (hBtn) hBtn.textContent = (j.haptic ? '📳' : '📴') + (STATE.language==='hi' ? ' कंपन' : ' Haptic');
+
+  const cw = document.getElementById('japaCustomWrap');
+  if (cw) cw.classList.toggle('hidden', j.mantra !== 'custom');
+}
+
+function japaCount() {
+  japaEnsureToday();
+  STATE.japa.todayCount += 1;
+  STATE.japa.totalCount += 1;
+  const completed = STATE.japa.todayCount % JAPA_MALA === 0;
+  if (completed) {
+    japaTone(528, 700, 'sine'); japaBuzz([40, 60, 120]);
+    japaCelebrate();
+  } else {
+    japaTone(880, 60, 'sine'); japaBuzz(12);
+    const bead = document.querySelector('#japaModal .japa-bead');
+    if (bead) { bead.classList.remove('pulse'); void bead.offsetWidth; bead.classList.add('pulse'); }
+  }
+  renderJapaModal();
+  saveState();
+}
+window.japaCount = japaCount;
+
+function japaUndo() {
+  japaEnsureToday();
+  if (STATE.japa.todayCount > 0) STATE.japa.todayCount -= 1;
+  if (STATE.japa.totalCount > 0) STATE.japa.totalCount -= 1;
+  renderJapaModal();
+  saveState();
+}
+window.japaUndo = japaUndo;
+
+function japaCelebrate() {
+  const card = document.querySelector('#japaModal .japa-card');
+  if (!card) return;
+  const banner = document.createElement('div');
+  banner.className = 'japa-celebrate';
+  const roundsToday = Math.floor(STATE.japa.todayCount / JAPA_MALA);
+  banner.textContent = STATE.language === 'hi'
+    ? `🌼 ${roundsToday} माला पूर्ण! राधे राधे 🙏`
+    : `🌼 Mala ${roundsToday} complete! Radhe Radhe 🙏`;
+  card.appendChild(banner);
+  setTimeout(() => { banner.classList.add('show'); }, 10);
+  setTimeout(() => { banner.classList.remove('show'); }, 2600);
+  setTimeout(() => { if (banner.parentNode) banner.parentNode.removeChild(banner); }, 3000);
+}
+
+function japaSetMantra(key) {
+  japaEnsureToday();
+  STATE.japa.mantra = key;
+  document.querySelectorAll('#japaModal .japa-chip').forEach(c => c.classList.remove('active'));
+  const idx = ['radhe','hare','vasudev','sharanam','custom'].indexOf(key);
+  const chips = document.querySelectorAll('#japaModal .japa-chip');
+  if (chips[idx]) chips[idx].classList.add('active');
+  renderJapaModal();
+  if (key === 'custom') { const el = document.getElementById('japaCustomInput'); if (el) el.focus(); }
+  saveState();
+}
+window.japaSetMantra = japaSetMantra;
+
+function japaSetCustom(text) {
+  if (!STATE.japa) japaEnsureToday();
+  STATE.japa.customText = text;
+  const devEl = document.getElementById('japaMantraDev');
+  if (devEl && STATE.japa.mantra === 'custom') devEl.textContent = (text || '').trim() || (STATE.language==='hi'?'अपना मंत्र लिखें':'Enter your mantra');
+  saveState();
+}
+window.japaSetCustom = japaSetCustom;
+
+function japaToggleSound() { japaEnsureToday(); STATE.japa.sound = !STATE.japa.sound; if (STATE.japa.sound) japaTone(880,60,'sine'); renderJapaModal(); saveState(); }
+window.japaToggleSound = japaToggleSound;
+function japaToggleHaptic() { japaEnsureToday(); STATE.japa.haptic = !STATE.japa.haptic; if (STATE.japa.haptic) japaBuzz(20); renderJapaModal(); saveState(); }
+window.japaToggleHaptic = japaToggleHaptic;
+
+function japaResetToday() {
+  const hi = STATE.language === 'hi';
+  if (!confirm(hi ? 'आज की गिनती रीसेट करें? (कुल जप सुरक्षित रहेंगे)' : "Reset today's count? (Your lifetime total is kept)")) return;
+  japaEnsureToday();
+  STATE.japa.todayCount = 0;
+  renderJapaModal();
+  saveState();
+  showToast(hi ? 'आज की गिनती रीसेट हो गई' : "Today's count reset");
+}
+window.japaResetToday = japaResetToday;
+
+function closeJapaModal(e) {
+  const m = document.getElementById('japaModal');
+  if (m && (!e || e.target === m)) m.classList.add('hidden');
+}
+window.closeJapaModal = closeJapaModal;
+
 function closeProductModal(e) {
   if (!e || e.target === document.getElementById('productModal')) {
     document.getElementById('productModal').classList.add('hidden');
@@ -1686,6 +2292,27 @@ function openProfileModal() {
       <div class="pf-stat"><span class="pf-stat-num">${entries}</span><span class="pf-stat-lbl">Journal</span></div>
       <div class="pf-stat"><span class="pf-stat-num">${streak}</span><span class="pf-stat-lbl">Day Streak</span></div>
     </div>
+
+    ${STATE.isPremium ? `
+    <div class="pf-premium pf-premium-on">
+      <div class="pf-premium-row">
+        <span class="pf-premium-ico">🪔</span>
+        <div>
+          <div class="pf-premium-title">KrishnaVerse Premium</div>
+          <div class="pf-premium-sub">Active · all word-by-word & recitations unlocked</div>
+        </div>
+      </div>
+    </div>` : `
+    <div class="pf-premium" onclick="upgradeFromProfile()">
+      <div class="pf-premium-row">
+        <span class="pf-premium-ico">🪔</span>
+        <div>
+          <div class="pf-premium-title">Upgrade to Premium</div>
+          <div class="pf-premium-sub">Word-by-word for all 700 verses + authentic recitations · ₹199/year</div>
+        </div>
+        <span class="pf-premium-cta">Upgrade →</span>
+      </div>
+    </div>`}
 
     <div class="pf-section">
       <label class="pf-label">Display Name</label>
@@ -1721,6 +2348,15 @@ function closeProfileModal(e) {
   }
 }
 window.closeProfileModal = closeProfileModal;
+
+// Profile → Upgrade entry point: close the profile sheet, then open the
+// premium modal. First principles: the upgrade prompt lives wherever the user
+// thinks about their account, so Profile is the natural home for it.
+function upgradeFromProfile() {
+  closeProfileModal();
+  requestPremiumUpgrade();
+}
+window.upgradeFromProfile = upgradeFromProfile;
 
 function _pfMsg(text, ok) {
   const el = document.getElementById('pfMsg');

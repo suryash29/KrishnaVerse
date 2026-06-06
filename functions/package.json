@@ -1,0 +1,19 @@
+{
+  "name": "krishnaverse-functions",
+  "description": "KrishnaVerse Cloud Functions — Razorpay (UPI) premium upgrade",
+  "engines": {
+    "node": "20"
+  },
+  "main": "index.js",
+  "private": true,
+  "scripts": {
+    "serve": "firebase emulators:start --only functions",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^5.1.0",
+    "razorpay": "^2.9.5"
+  }
+}

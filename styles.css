@@ -883,15 +883,73 @@ svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; 
   color: var(--saffron); white-space: pre-line; margin-bottom: 4px;
 }
 .sd-translit { font-size: 13px; color: var(--text-muted); font-style: italic; white-space: pre-line; line-height: 1.6; }
-.sd-word-grid { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.sd-word-grid { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
 .sd-word-chip {
   background: var(--bg-input); border-radius: var(--radius-sm);
-  padding: 6px 10px;
+  padding: 8px 12px; min-width: 96px;
 }
-.sdw-word { font-family: var(--font-deva); font-size: 13px; color: var(--text-primary); display: block; }
-.sdw-meaning { font-size: 10px; color: var(--text-muted); }
-.sd-translation { font-size: 15px; color: var(--text-primary); line-height: 1.7; }
+.sdw-word { font-family: var(--font-deva); font-size: 14px; font-weight: 600; color: var(--saffron); display: block; margin-bottom: 3px; }
+.sdw-meaning { font-size: 11px; line-height: 1.45; display: block; }
+.sdw-en { color: var(--text-secondary); }
+.sdw-hi { font-family: var(--font-deva); font-size: 12px; color: var(--text-muted); }
+.sdw-en + .sdw-hi, .sdw-hi + .sdw-en { margin-top: 1px; }
+.sd-translation { font-size: 15px; color: var(--text-primary); line-height: 1.7; margin-bottom: 8px; }
+.sd-translation:last-child { margin-bottom: 0; }
+.sd-trans-hi { font-family: var(--font-deva); color: var(--text-primary); }
+.sd-trans-en { color: var(--text-primary); }
 .sd-hindi { font-family: var(--font-deva); font-size: 15px; color: var(--text-secondary); line-height: 1.7; }
+
+/* Premium lock (word-by-word upsell on non-curated verses) */
+.sd-premium-lock {
+  display: flex; align-items: center; gap: 12px; cursor: pointer;
+  background: linear-gradient(135deg, rgba(244,185,66,0.10), rgba(232,105,10,0.10));
+  border: 1px solid rgba(244,185,66,0.35);
+  border-radius: var(--radius-md); padding: 14px; margin: 8px 0;
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+.sd-premium-lock:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,0,0,0.18); }
+.sd-lock-icon { font-size: 24px; }
+.sd-lock-body { flex: 1; min-width: 0; }
+.sd-lock-title { font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 3px; }
+.sd-lock-sub { font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-bottom: 6px; }
+.sd-lock-cta { font-size: 13px; font-weight: 700; color: var(--gold-light); }
+
+/* Audio: free TTS read-aloud button */
+.sd-listen-btn {
+  display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+  background: var(--bg-input); color: var(--text-primary);
+  border: 1px solid var(--border-strong, var(--border)); border-radius: 999px;
+  padding: 8px 16px; font-size: 13px; font-weight: 600; margin-bottom: 8px;
+  transition: background .12s ease, transform .12s ease;
+}
+.sd-listen-btn:hover { transform: translateY(-1px); }
+.sd-listen-btn.playing {
+  background: linear-gradient(135deg, var(--saffron), var(--gold));
+  color: #fff; border-color: transparent;
+}
+.sd-listen-ico { font-size: 15px; }
+
+/* Audio: premium chapter recitation */
+.sd-audio-premium {
+  background: var(--bg-input); border-radius: var(--radius-md);
+  padding: 12px; margin: 4px 0 8px;
+  border-left: 3px solid var(--gold);
+}
+.sd-audio-title { font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; }
+.sd-audio-premium audio { display: block; }
+
+/* Premium modal */
+.premium-card { text-align: center; }
+.pr-crown { font-size: 40px; margin-bottom: 6px; }
+.pr-title { font-size: 20px; font-weight: 800; color: var(--text-primary); margin-bottom: 4px; }
+.pr-price { font-size: 32px; font-weight: 800; color: var(--gold-light); margin-bottom: 14px; }
+.pr-price span { font-size: 15px; font-weight: 500; color: var(--text-muted); }
+.pr-benefits { list-style: none; padding: 0; margin: 0 0 16px; text-align: left; }
+.pr-benefits li { font-size: 14px; color: var(--text-secondary); padding: 7px 0; border-bottom: 1px solid var(--border); }
+.pr-benefits li:last-child { border-bottom: none; }
+.pr-upi-label { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px; }
+.pr-upi { font-size: 15px; font-weight: 700; color: var(--saffron); margin-bottom: 10px; }
+.pr-note { font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-top: 12px; }
 .sd-box {
   background: var(--bg-input); border-radius: var(--radius-md);
   padding: 14px; margin: 8px 0;
@@ -1241,6 +1299,19 @@ svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; 
 }
 .pm-wa-btn:hover { transform: translateY(-1px); }
 .pm-wa-btn svg { width: 20px; height: 20px; fill: white; stroke: none; }
+
+/* Razorpay UPI primary CTA */
+.pm-rzp-btn {
+  width: 100%; padding: 14px; border: none; cursor: pointer;
+  background: linear-gradient(135deg, #E8690A 0%, #C55507 100%); color: #fff;
+  font-size: 15px; font-weight: 700; border-radius: var(--radius-md);
+  box-shadow: 0 4px 16px rgba(232,105,10,0.35);
+  transition: transform var(--transition), box-shadow var(--transition);
+  margin-bottom: 6px;
+}
+.pm-rzp-btn:hover { transform: translateY(-1px); }
+.pm-rzp-btn:disabled { opacity: 0.7; cursor: default; transform: none; }
+.pr-or { text-align: center; font-size: 12px; color: var(--text-muted); margin: 8px 0; text-transform: uppercase; letter-spacing: 1px; }
 
 /* ── Responsive (Tablet+) ── */
 @media (min-width: 480px) {
@@ -1603,6 +1674,25 @@ svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; 
 }
 .pf-stat-num { display: block; font-size: 20px; font-weight: 700; color: #E8690A; }
 .pf-stat-lbl { font-size: 11px; opacity: 0.75; }
+
+/* Profile → Premium card */
+.pf-premium {
+  background: linear-gradient(135deg, #FFF6E6 0%, #FDEBC8 100%);
+  border: 1px solid #F2C879; border-radius: 14px;
+  padding: 14px; margin-bottom: 18px; cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.pf-premium:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(232,105,10,0.18); }
+.pf-premium-on { cursor: default; }
+.pf-premium-on:hover { transform: none; box-shadow: none; }
+.pf-premium-row { display: flex; align-items: center; gap: 12px; }
+.pf-premium-ico { font-size: 26px; line-height: 1; }
+.pf-premium-title { font-size: 15px; font-weight: 700; color: #8A4B0A; }
+.pf-premium-sub { font-size: 12px; opacity: 0.8; margin-top: 2px; line-height: 1.4; }
+.pf-premium-cta {
+  margin-left: auto; white-space: nowrap; font-size: 13px; font-weight: 700;
+  color: #fff; background: #E8690A; padding: 7px 12px; border-radius: 999px;
+}
 .pf-section { margin-bottom: 16px; }
 .pf-label { display: block; font-size: 12px; font-weight: 600; opacity: 0.8; margin-bottom: 6px; }
 .pf-row { display: flex; gap: 8px; }
@@ -1625,3 +1715,76 @@ svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; 
 }
 body.dark-mode .pf-input { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.2); }
 body.dark-mode .kv-verify-notice { background: #3a2c10; color: #FFD79A; border-color: #6b5320; }
+
+/* ═══════════ Japa Mala (chant counter) ═══════════ */
+.japa-overlay { align-items: flex-start; }
+.japa-card {
+  position: relative; width: min(440px, 94vw); margin: 5vh auto;
+  background: radial-gradient(120% 120% at 50% 0%, #FFF7EC 0%, #FBE8CC 60%, #F6DCB4 100%);
+  border-radius: 24px; padding: 20px 18px 22px; text-align: center;
+  box-shadow: 0 24px 60px rgba(120,60,0,0.30); overflow: hidden;
+}
+.japa-close { position: absolute; top: 10px; right: 12px; }
+.japa-title { font-size: 18px; font-weight: 800; color: #8A4B0A; margin-bottom: 12px; }
+.japa-mantra-row { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 8px; }
+.japa-chip {
+  border: 1px solid #E7B36A; background: #fff;
+  color: #8A4B0A; font-size: 13px; font-weight: 600; padding: 6px 12px;
+  border-radius: 999px; cursor: pointer; transition: all 0.15s ease;
+}
+.japa-chip.active { background: #E8690A; color: #fff; border-color: #E8690A; }
+.japa-custom-wrap { margin: 4px 0 8px; }
+.japa-custom-input {
+  width: 100%; padding: 9px 12px; border: 1px solid #E7B36A; border-radius: 10px;
+  font-size: 15px; text-align: center; background: #fff; color: #5A3410;
+}
+.japa-bead-wrap {
+  position: relative; width: 280px; max-width: 78vw; aspect-ratio: 1/1;
+  margin: 10px auto 6px; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
+}
+.japa-ring { position: absolute; inset: 0; width: 100%; height: 100%; }
+.japa-ring-bg { fill: none; stroke: rgba(138,75,10,0.14); stroke-width: 10; }
+.japa-ring-fg {
+  fill: none; stroke: #E8690A; stroke-width: 10; stroke-linecap: round;
+  transition: stroke-dashoffset 0.35s ease;
+}
+.japa-bead {
+  position: absolute; inset: 26px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #FFFBF4 0%, #F6C98A 45%, #D98A3A 100%);
+  box-shadow: inset 0 6px 14px rgba(255,255,255,0.6), inset 0 -10px 20px rgba(120,60,0,0.35), 0 8px 20px rgba(120,60,0,0.25);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  transition: transform 0.08s ease;
+}
+.japa-bead.pulse { animation: japaPulse 0.18s ease; }
+@keyframes japaPulse { 0% { transform: scale(1); } 50% { transform: scale(0.94); } 100% { transform: scale(1); } }
+.japa-bead:active { transform: scale(0.97); }
+.japa-mantra-dev { font-size: 21px; font-weight: 800; color: #7A3D06; line-height: 1.2; padding: 0 10px; }
+.japa-mantra-tr { font-size: 12px; color: #9A5A1A; font-style: italic; margin-bottom: 2px; }
+.japa-bead-count { font-size: 52px; font-weight: 800; color: #5A2E04; line-height: 1; }
+.japa-bead-of { font-size: 12px; color: #9A5A1A; letter-spacing: 1px; }
+.japa-tap-hint { font-size: 11px; color: rgba(122,61,6,0.6); margin-top: 4px; text-transform: uppercase; letter-spacing: 1.5px; }
+.japa-stats { display: flex; gap: 8px; margin: 12px 0 10px; }
+.japa-stat { flex: 1; background: rgba(255,255,255,0.6); border-radius: 12px; padding: 8px 4px; }
+.japa-stat-num { display: block; font-size: 20px; font-weight: 800; color: #E8690A; }
+.japa-stat-lbl { font-size: 10.5px; color: #8A4B0A; opacity: 0.85; }
+.japa-controls { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.japa-ctrl {
+  border: 1px solid rgba(138,75,10,0.25); background: rgba(255,255,255,0.7);
+  color: #8A4B0A; font-size: 12.5px; font-weight: 600; padding: 7px 12px;
+  border-radius: 999px; cursor: pointer;
+}
+.japa-ctrl.japa-reset { color: #C0392B; border-color: rgba(192,57,43,0.3); }
+.japa-celebrate {
+  position: absolute; left: 50%; top: 42%;
+  transform: translate(-50%,-50%) scale(0.8);
+  background: #fff; color: #8A4B0A; font-weight: 800; font-size: 16px;
+  padding: 14px 20px; border-radius: 16px; box-shadow: 0 12px 30px rgba(120,60,0,0.35);
+  opacity: 0; transition: opacity 0.3s ease, transform 0.3s ease; pointer-events: none; z-index: 5; white-space: nowrap;
+}
+.japa-celebrate.show { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+body.dark-mode .japa-card { background: radial-gradient(120% 120% at 50% 0%, #3a2c14 0%, #2a2010 70%, #211a0c 100%); }
+body.dark-mode .japa-title, body.dark-mode .japa-stat-lbl, body.dark-mode .japa-ctrl { color: #FFD79A; }
+body.dark-mode .japa-chip { background: rgba(255,255,255,0.06); color: #FFD79A; border-color: #6b5320; }
+body.dark-mode .japa-chip.active { background: #E8690A; color: #fff; }
+body.dark-mode .japa-stat { background: rgba(255,255,255,0.06); }
+body.dark-mode .japa-custom-input { background: rgba(255,255,255,0.06); color: #FFE9C7; border-color: #6b5320; }

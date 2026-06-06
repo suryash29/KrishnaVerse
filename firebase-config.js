@@ -40,4 +40,9 @@
   // Shared handles for auth.js and shop-data.js (classic scripts).
   window.kvAuth = firebase.auth();
   window.kvDb = firebase.firestore();
+  // Cloud Functions handle (Razorpay order/verify callables).
+  // Region MUST match functions/index.js setGlobalOptions region.
+  if (typeof firebase.functions === 'function') {
+    window.kvFunctions = firebase.functions('asia-south1');
+  }
 })();

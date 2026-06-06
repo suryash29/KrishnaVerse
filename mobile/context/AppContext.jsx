@@ -15,6 +15,12 @@ const defaultState = {
   moodHistory: [],
   streak: { current: 0, best: 0, lastDate: null },
   todayMood: null,
+  isPremium: false, // ₹199/yr — unlocks word-by-word for non-curated verses
+  // Japa (digital mala): one round = 108 beads. todayCount resets daily.
+  japa: {
+    mantra: 'radhe', customText: '', todayCount: 0, totalCount: 0,
+    lastDate: null, sound: true, haptic: true,
+  },
 };
 
 export function AppProvider({ children }) {
@@ -40,9 +46,9 @@ export function AppProvider({ children }) {
   // Persist locally on every state change
   useEffect(() => {
     if (!loaded) return;
-    const { darkMode, language, bookmarks, notes, journal, moodHistory, streak } = state;
+    const { darkMode, language, bookmarks, notes, journal, moodHistory, streak, isPremium, japa } = state;
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({
-      darkMode, language, bookmarks, notes, journal, moodHistory, streak
+      darkMode, language, bookmarks, notes, journal, moodHistory, streak, isPremium, japa
     })).catch(() => {});
   }, [state, loaded]);
 
@@ -65,9 +71,9 @@ export function AppProvider({ children }) {
   useEffect(() => {
     if (!loaded || !user || !cloudSynced) return;
     if (cloudTimer.current) clearTimeout(cloudTimer.current);
-    const { darkMode, language, bookmarks, notes, journal, moodHistory, streak } = state;
+    const { darkMode, language, bookmarks, notes, journal, moodHistory, streak, isPremium, japa } = state;
     cloudTimer.current = setTimeout(() => {
-      saveUserData(user.uid, { darkMode, language, bookmarks, notes, journal, moodHistory, streak });
+      saveUserData(user.uid, { darkMode, language, bookmarks, notes, journal, moodHistory, streak, isPremium, japa });
     }, 1200);
     return () => { if (cloudTimer.current) clearTimeout(cloudTimer.current); };
   }, [state, loaded, user, cloudSynced]);

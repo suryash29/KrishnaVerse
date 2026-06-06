@@ -11,12 +11,14 @@ import { useApp } from '../../context/AppContext';
 import { getTodayShloka, MOODS, getShlokaById } from '../../constants/Shlokas';
 import { Colors } from '../../constants/Colors';
 import { useRouter } from 'expo-router';
+import JapaSheet from '../../components/JapaSheet';
 
 export default function HomeScreen() {
   const { user, logout } = useAuth();
   const { streak, bookmarks, journal, notes, moodHistory, logMood, updateStreak, toggleBookmark, isBookmarked } = useApp();
   const [todayShloka, setTodayShloka] = useState(null);
   const [greeting, setGreeting] = useState('Good morning');
+  const [showJapa, setShowJapa] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -114,14 +116,14 @@ export default function HomeScreen() {
               { emoji: '🪈', label: 'Ask Krishna', desc: 'AI Guide', screen: 'guide' },
               { emoji: '📖', label: 'Library', desc: 'All Shlokas', screen: 'explore' },
               { emoji: '🧘', label: 'Reflect', desc: 'My Space', screen: 'reflect' },
+              { emoji: '📿', label: 'Japa Mala', desc: 'Chant 108', action: 'japa' },
               { emoji: '🔖', label: 'Bookmarks', desc: `${bookmarks.length} saved`, screen: 'reflect' },
-              { emoji: '📝', label: 'Journal', desc: `${journal.length} entries`, screen: 'reflect' },
               { emoji: '🛕', label: 'Shop', desc: 'Spiritual', screen: 'shop' },
             ].map(item => (
               <TouchableOpacity
                 key={item.label}
                 style={styles.actionCard}
-                onPress={() => router.push(`/(tabs)/${item.screen}`)}
+                onPress={() => item.action === 'japa' ? setShowJapa(true) : router.push(`/(tabs)/${item.screen}`)}
                 activeOpacity={0.8}
               >
                 <Text style={styles.actionEmoji}>{item.emoji}</Text>
@@ -160,6 +162,8 @@ export default function HomeScreen() {
 
         <View style={{ height: 20 }} />
       </ScrollView>
+
+      <JapaSheet visible={showJapa} onClose={() => setShowJapa(false)} />
     </SafeAreaView>
   );
 }
