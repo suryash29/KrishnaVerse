@@ -2,12 +2,15 @@
    KrishnaVerse – Service Worker (Offline-first PWA)
    ═══════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'krishnaverse-v1';
+const CACHE_NAME = 'krishnaverse-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/styles.css',
   '/app.js',
+  '/shop-data.js',
+  '/firebase-config.js',
+  '/auth.js',
   '/data/shlokas.js',
   '/manifest.json',
   'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&family=Noto+Sans+Devanagari:wght@400;500;600&display=swap',
@@ -39,6 +42,18 @@ self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
+
+  // Never cache the admin console or live Firestore/Firebase API traffic —
+  // these must always be fresh and online.
+  if (
+    url.pathname.startsWith('/admin') ||
+    url.hostname.endsWith('firestore.googleapis.com') ||
+    url.hostname.endsWith('firebaseio.com') ||
+    url.hostname.endsWith('identitytoolkit.googleapis.com')
+  ) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
 
   // Static assets: cache-first
   if (

@@ -1210,26 +1210,51 @@ function renderDonationCauses() {
   `).join('');
 }
 
+// Products are loaded live from Firestore by shop-data.js (with an offline
+// fallback). kvActiveProducts() / kvFmtPrice() are provided there; these
+// guards keep the shop working even if that module hasn't loaded yet.
+function _shopProducts() {
+  return (typeof window.kvActiveProducts === 'function') ? window.kvActiveProducts() : SHOP_PRODUCTS;
+}
+function _shopPrice(price) {
+  return (typeof window.kvFmtPrice === 'function') ? window.kvFmtPrice(price) : String(price);
+}
+
 function renderProducts(tab) {
   const el = document.getElementById('productsGrid');
   if (!el) return;
-  const list = tab === 'all' ? SHOP_PRODUCTS : SHOP_PRODUCTS.filter(p => p.category === tab);
-  el.innerHTML = list.map(p => `
-    <div class="product-card" onclick="openProductModal('${p.id}')">
+  currentShopTab = tab;
+  window.currentShopTab = tab;
+  const all = _shopProducts();
+  const list = tab === 'all' ? all : all.filter(p => p.category === tab);
+  if (!list.length) {
+    el.innerHTML = `<div class="shop-empty">No items in this category yet. 🙏</div>`;
+    return;
+  }
+  el.innerHTML = list.map(p => {
+    const media = p.imageUrl
+      ? `<img class="product-img" src="${p.imageUrl}" alt="${p.name}" loading="lazy" />`
+      : `<span class="product-emoji">${p.emoji || '🛍️'}</span>`;
+    const soldOut = p.inStock === false;
+    return `
+    <div class="product-card${soldOut ? ' sold-out' : ''}" onclick="openProductModal('${p.id}')">
       ${p.tag ? `<div class="product-tag">${p.tag}</div>` : ''}
-      <span class="product-emoji">${p.emoji}</span>
+      ${soldOut ? `<div class="product-soldout">Sold out</div>` : ''}
+      ${media}
       <div class="product-name">${p.name}</div>
       <div class="product-desc">${p.desc}</div>
       <div class="product-footer">
-        <span class="product-price">${p.price}</span>
+        <span class="product-price">${_shopPrice(p.price)}</span>
         <button class="product-order-btn" onclick="event.stopPropagation();openProductModal('${p.id}')">+</button>
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 }
+window.renderProducts = renderProducts;
 
 function switchShopTab(tab, btn) {
   currentShopTab = tab;
+  window.currentShopTab = tab;
   document.querySelectorAll('.shop-tab').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   renderProducts(tab);
@@ -1303,14 +1328,21 @@ function closeDonateModal(e) {
 
 // ── Product Modal ──
 function openProductModal(productId) {
-  const p = SHOP_PRODUCTS.find(x => x.id === productId);
+  const p = _shopProducts().find(x => x.id === productId);
   if (!p) return;
-  const msg = encodeURIComponent(`Jai Shri Krishna! 🙏\n\nI want to order:\n\n*${p.name}*\nPrice: ${p.price}\n\n${p.desc}\n\nPlease confirm availability and delivery details.\n\nHare Krishna 🪔`);
-  const waLink = `https://wa.me/?text=${msg}`;
+  const priceStr = _shopPrice(p.price);
+  // SHOP_WHATSAPP can be set (e.g. '919812345678') to route orders to your number
+  const waBase = (typeof window.SHOP_WHATSAPP === 'string' && window.SHOP_WHATSAPP)
+    ? `https://wa.me/${window.SHOP_WHATSAPP}` : `https://wa.me/`;
+  const msg = encodeURIComponent(`Jai Shri Krishna! 🙏\n\nI want to order:\n\n*${p.name}*\nPrice: ${priceStr}\n\n${p.desc}\n\nPlease confirm availability and delivery details.\n\nHare Krishna 🪔`);
+  const waLink = `${waBase}?text=${msg}`;
+  const media = p.imageUrl
+    ? `<img class="pm-img" src="${p.imageUrl}" alt="${p.name}" />`
+    : `<span class="pm-emoji">${p.emoji || '🛍️'}</span>`;
   document.getElementById('productModalBody').innerHTML = `
-    <span class="pm-emoji">${p.emoji}</span>
+    ${media}
     <div class="pm-name">${p.name}</div>
-    <div class="pm-price">${p.price}</div>
+    <div class="pm-price">${priceStr}</div>
     <div class="pm-desc">${p.desc}</div>
     <div class="pm-divider"></div>
     <div class="pm-note">All products are carefully sourced from trusted artisans & publishers. Order via WhatsApp and our team will assist you with delivery.</div>

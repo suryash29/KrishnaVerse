@@ -1,12 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Linking, Alert,
+  Linking, Alert, Image, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { Colors } from '../../constants/Colors';
+import { fetchProducts, formatPrice, SHOP_TABS, TAB_TO_CATEGORY } from '../../constants/Shop';
+
+// 👇 Optional: set your shop WhatsApp number (with country code, no +) to
+// route orders to a specific number, e.g. '919812345678'. Leave '' for picker.
+const SHOP_WHATSAPP = '';
 
 const CAUSES = [
   {
@@ -35,28 +40,20 @@ const CAUSES = [
   },
 ];
 
-const PRODUCTS = [
-  { id: 'gita1', category: 'books', emoji: '📕', title: 'Bhagavad Gita As It Is', author: 'Srila Prabhupada', price: '₹250', tag: 'Bestseller' },
-  { id: 'gita2', category: 'books', emoji: '📗', title: 'Gita Makaranda', author: 'Vidyaprakashananda', price: '₹180', tag: null },
-  { id: 'puja1', category: 'puja', emoji: '🪔', title: 'Ghee Diya Set (5pc)', author: null, price: '₹350', tag: 'Handmade' },
-  { id: 'puja2', category: 'puja', emoji: '🌺', title: 'Puja Thali Premium', author: null, price: '₹599', tag: null },
-  { id: 'mala1', category: 'counter', emoji: '📿', title: 'Tulsi Mala 108', author: null, price: '₹299', tag: 'Sacred' },
-  { id: 'mala2', category: 'counter', emoji: '📿', title: 'Chandan Mala', author: null, price: '₹449', tag: null },
-  { id: 'frame1', category: 'frames', emoji: '🖼️', title: 'Krishna Arjuna Frame', author: null, price: '₹799', tag: 'Popular' },
-  { id: 'frame2', category: 'frames', emoji: '🖼️', title: 'Gita Shloka Print', author: null, price: '₹399', tag: null },
-];
-
-const SHOP_TABS = ['All', 'Books', 'Puja', 'Mala', 'Frames'];
-
 export default function ShopScreen() {
   const [shopTab, setShopTab] = useState('All');
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    fetchProducts().then(list => { if (active) { setProducts(list); setLoading(false); } });
+    return () => { active = false; };
+  }, []);
 
   const filtered = shopTab === 'All'
-    ? PRODUCTS
-    : PRODUCTS.filter(p => {
-        const map = { Books: 'books', Puja: 'puja', Mala: 'counter', Frames: 'frames' };
-        return p.category === map[shopTab];
-      });
+    ? products
+    : products.filter(p => p.category === TAB_TO_CATEGORY[shopTab]);
 
   function handleDonate(cause, amount) {
     const upiUrl = `upi://pay?pa=${cause.upi}&pn=${encodeURIComponent(cause.title)}&am=${amount}&cu=INR&tn=${encodeURIComponent('KrishnaVerse Donation')}`;
@@ -67,9 +64,12 @@ export default function ShopScreen() {
 
   function handleOrder(product) {
     const msg = encodeURIComponent(
-      `Hare Krishna 🙏\n\nI would like to order: *${product.title}*\nPrice: ${product.price}\n\nFrom KrishnaVerse App`
+      `Hare Krishna 🙏\n\nI would like to order: *${product.title}*\nPrice: ${formatPrice(product.price)}\n\nFrom KrishnaVerse App`
     );
-    Linking.openURL(`whatsapp://send?text=${msg}`).catch(() => {
+    const url = SHOP_WHATSAPP
+      ? `whatsapp://send?phone=${SHOP_WHATSAPP}&text=${msg}`
+      : `whatsapp://send?text=${msg}`;
+    Linking.openURL(url).catch(() => {
       Alert.alert('WhatsApp Not Found', 'Install WhatsApp to order via chat.');
     });
   }
@@ -138,29 +138,40 @@ export default function ShopScreen() {
           </ScrollView>
 
           {/* Products Grid */}
-          <View style={styles.productsGrid}>
-            {filtered.map(product => (
-              <View key={product.id} style={styles.productCard}>
-                {product.tag && (
-                  <View style={styles.productTag}>
-                    <Text style={styles.productTagText}>{product.tag}</Text>
-                  </View>
-                )}
-                <Text style={styles.productEmoji}>{product.emoji}</Text>
-                <Text style={styles.productTitle}>{product.title}</Text>
-                {product.author && (
-                  <Text style={styles.productAuthor}>{product.author}</Text>
-                )}
-                <Text style={styles.productPrice}>{product.price}</Text>
-                <TouchableOpacity
-                  style={styles.orderBtn}
-                  onPress={() => handleOrder(product)}
-                >
-                  <Text style={styles.orderBtnText}>Order</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
-          </View>
+          {loading ? (
+            <ActivityIndicator color={Colors.primary} style={{ marginTop: 24 }} />
+          ) : filtered.length === 0 ? (
+            <Text style={styles.emptyText}>No items in this category yet. 🙏</Text>
+          ) : (
+            <View style={styles.productsGrid}>
+              {filtered.map(product => (
+                <View key={product.id} style={[styles.productCard, product.inStock === false && { opacity: 0.55 }]}>
+                  {product.tag ? (
+                    <View style={styles.productTag}>
+                      <Text style={styles.productTagText}>{product.tag}</Text>
+                    </View>
+                  ) : null}
+                  {product.imageUrl ? (
+                    <Image source={{ uri: product.imageUrl }} style={styles.productImg} />
+                  ) : (
+                    <Text style={styles.productEmoji}>{product.emoji}</Text>
+                  )}
+                  <Text style={styles.productTitle}>{product.title}</Text>
+                  {product.desc ? (
+                    <Text style={styles.productAuthor} numberOfLines={2}>{product.desc}</Text>
+                  ) : null}
+                  <Text style={styles.productPrice}>{formatPrice(product.price)}</Text>
+                  <TouchableOpacity
+                    style={styles.orderBtn}
+                    onPress={() => handleOrder(product)}
+                    disabled={product.inStock === false}
+                  >
+                    <Text style={styles.orderBtnText}>{product.inStock === false ? 'Sold out' : 'Order'}</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
 
         <View style={{ height: 40 }} />
@@ -301,6 +312,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   productEmoji: { fontSize: 36 },
+  productImg: { width: '100%', height: 80, borderRadius: 10, resizeMode: 'cover' },
+  emptyText: { color: Colors.textMuted, textAlign: 'center', marginTop: 20, fontSize: 13 },
   productTitle: {
     fontSize: 13,
     fontWeight: '700',

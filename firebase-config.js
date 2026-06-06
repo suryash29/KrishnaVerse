@@ -1,11 +1,12 @@
 // ─────────────────────────────────────────────────────────
 //  Firebase Configuration – KrishnaVerse Web App
-//  Steps:
-//  1. Go to https://console.firebase.google.com
-//  2. Create project "KrishnaVerse"
-//  3. Enable Authentication → Email/Password
-//  4. Add a Web App → copy your config here
-//  5. Replace ALL placeholder values below
+//  Auth + Cloud Firestore (products, orders, profiles)
+//
+//  NOTE: These web API keys are SAFE to expose publicly. Firebase
+//  web config is identifying, not secret — real protection comes
+//  from Firestore Security Rules (see firestore.rules) and the
+//  authorized-domains list in the Firebase console.
+//  Docs: https://firebase.google.com/docs/projects/api-keys
 // ─────────────────────────────────────────────────────────
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
@@ -18,8 +19,22 @@ import {
   updateProfile,
   sendPasswordResetEmail,
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+import {
+  getFirestore,
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  setDoc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  orderBy,
+  where,
+  serverTimestamp,
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyC-pEkR4nCTcCyaCTlVYI1qR0earDh9rx8",
   authDomain: "krishnaverse-5d551.firebaseapp.com",
@@ -32,8 +47,12 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const db = getFirestore(app);
 
 export {
+  // app
+  app,
+  // auth
   auth,
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -41,4 +60,18 @@ export {
   signOut,
   updateProfile,
   sendPasswordResetEmail,
+  // firestore
+  db,
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  setDoc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  orderBy,
+  where,
+  serverTimestamp,
 };

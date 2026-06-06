@@ -21,7 +21,9 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#E8690A"
       },
-      "package": "com.krishnaverse.app"
+      "package": "com.krishnaverse.app",
+      "versionCode": 1,
+      "permissions": ["INTERNET"]
     },
     "web": {
       "bundler": "metro",

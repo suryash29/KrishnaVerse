@@ -1,0 +1,60 @@
+rules_version = '2';
+// ─────────────────────────────────────────────────────────
+//  KrishnaVerse – Cloud Firestore Security Rules
+//  Deploy:  firebase deploy --only firestore:rules
+//  Keep the admin email list in sync with admin.js (ADMIN_EMAILS).
+// ─────────────────────────────────────────────────────────
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Admins are identified by their signed-in email.
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in [
+          '1997sharmasurya@gmail.com'
+        ];
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // ── Products: world-readable catalog, admin-only writes ──
+    match /products/{productId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ── User profiles / app data: each user owns their doc ──
+    match /users/{uid} {
+      allow read, write: if isSignedIn() && request.auth.uid == uid;
+
+      // Nested per-user collections (bookmarks, journal, progress…)
+      match /{document=**} {
+        allow read, write: if isSignedIn() && request.auth.uid == uid;
+      }
+    }
+
+    // ── Orders: a signed-in user can place + read their own;
+    //    admins can read/update all (to fulfil them). ──
+    match /orders/{orderId} {
+      allow create: if isSignedIn()
+                    && request.resource.data.userId == request.auth.uid;
+      allow read, update: if isAdmin()
+                    || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    // ── Donations log (optional analytics) ──
+    match /donations/{donationId} {
+      allow create: if true; // allow anonymous donation intents
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Everything else: locked down by default.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

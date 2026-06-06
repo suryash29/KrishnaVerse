@@ -10,6 +10,7 @@
 
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, initializeAuth, getReactNativePersistence } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -45,5 +46,8 @@ try {
   auth = getAuth(app);
 }
 
-export { auth };
+// Cloud Firestore – live product catalog, orders, profiles
+const db = getFirestore(app);
+
+export { auth, db };
 export default app;

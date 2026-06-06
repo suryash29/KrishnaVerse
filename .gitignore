@@ -43,3 +43,16 @@ yarn-error.log*
 # Cache
 .cache/
 .babel_cache/
+
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Service-account keys & secrets (NEVER commit)
+*service-account*.json
+*-adminsdk-*.json
+google-services.json
+GoogleService-Info.plist
+play-service-account.json

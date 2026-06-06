@@ -1102,6 +1102,29 @@ svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; 
   flex-shrink: 0;
 }
 
+/* ── Shop: product images, sold-out, empty state ── */
+.product-img {
+  width: 100%; height: 96px; object-fit: cover;
+  border-radius: 10px; margin-bottom: 10px; display: block;
+  background: var(--bg-soft, rgba(0,0,0,0.04));
+}
+.product-card.sold-out { opacity: 0.55; }
+.product-soldout {
+  position: absolute; top: 8px; left: 8px;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.5px;
+  padding: 2px 8px; border-radius: 20px;
+  background: rgba(192,57,43,0.12); color: #C0392B;
+  border: 1px solid rgba(192,57,43,0.25);
+}
+.shop-empty {
+  grid-column: 1 / -1; text-align: center;
+  padding: 30px 10px; color: var(--text-muted); font-size: 13px;
+}
+.pm-img {
+  width: 100%; max-height: 220px; object-fit: cover;
+  border-radius: 14px; margin-bottom: 14px; display: block;
+}
+
 /* ── Donate Modal ── */
 .donate-modal-card { background: var(--bg-card); }
 .dm-cause-header { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
