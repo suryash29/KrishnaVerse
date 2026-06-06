@@ -2,7 +2,7 @@
    KrishnaVerse – Service Worker (Offline-first PWA)
    ═══════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'krishnaverse-v1.1.0';
+const CACHE_NAME = 'krishnaverse-v1.2.0';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -12,6 +12,8 @@ const STATIC_ASSETS = [
   '/firebase-config.js',
   '/auth.js',
   '/data/gita-verses.js',
+  '/data/word-by-word.js',
+  '/data/verse-audio.js',
   '/data/shlokas.js',
   '/manifest.json',
   'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&family=Noto+Sans+Devanagari:wght@400;500;600&display=swap',

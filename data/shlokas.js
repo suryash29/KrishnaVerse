@@ -725,6 +725,15 @@ const SHLOKAS = (function buildCompleteShlokas() {
   base.forEach(v => { delete curatedById[v.id]; });
   Object.values(curatedById).forEach(c => merged.push(c));
 
+  // Overlay authentic word-by-word (gita/gita, public domain) onto any verse
+  // that does not already carry curated word-by-word. Never overwrites curated.
+  var wbw = (typeof window !== 'undefined' && window.KV_WORD_BY_WORD) ? window.KV_WORD_BY_WORD : {};
+  merged.forEach(function (v) {
+    if ((!v.wordByWord || !v.wordByWord.length) && Array.isArray(wbw[v.id]) && wbw[v.id].length) {
+      v.wordByWord = wbw[v.id];
+    }
+  });
+
   // Keep canonical order: chapter, then verse.
   merged.sort((a, b) => a.chapter - b.chapter || a.verse - b.verse);
   return merged;

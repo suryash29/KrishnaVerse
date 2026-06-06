@@ -7,6 +7,7 @@
 // SHLOKAS array contains every verse of all 18 chapters with no gaps.
 
 import { BG_VERSES } from './GitaVerses';
+import { WORD_BY_WORD } from './WordByWord';
 
 const CURATED_SHLOKAS = [
   {
@@ -727,6 +728,14 @@ export const SHLOKAS = (() => {
   const merged = base.map(v => (curatedById[v.id] ? { ...v, ...curatedById[v.id] } : v));
   base.forEach(v => { delete curatedById[v.id]; });
   Object.values(curatedById).forEach(c => merged.push(c));
+  // Overlay authentic word-by-word (gita/gita, public domain) onto any verse that
+  // does not already carry curated word-by-word. Never overwrites curated data.
+  const wbw = WORD_BY_WORD && typeof WORD_BY_WORD === 'object' ? WORD_BY_WORD : {};
+  merged.forEach(v => {
+    if ((!v.wordByWord || !v.wordByWord.length) && Array.isArray(wbw[v.id]) && wbw[v.id].length) {
+      v.wordByWord = wbw[v.id];
+    }
+  });
   merged.sort((a, b) => a.chapter - b.chapter || a.verse - b.verse);
   return merged;
 })();

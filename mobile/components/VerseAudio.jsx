@@ -4,6 +4,7 @@ import * as Speech from 'expo-speech';
 import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { Colors } from '../constants/Colors';
 import { CHAPTER_AUDIO } from '../constants/Config';
+import { VERSE_AUDIO } from '../constants/VerseAudioMap';
 import { useApp } from '../context/AppContext';
 
 // Verse audio: free device TTS read-aloud for everyone + Premium authentic
@@ -20,7 +21,12 @@ export default function VerseAudio({ shloka, onUpgrade }) {
   const [loading, setLoading] = useState(false);
   const [playing, setPlaying] = useState(false);
 
+  // Prefer authentic per-verse recitation (gita/gita), fall back to a configured
+  // full-chapter recitation. Either is the Premium upgrade over free TTS.
+  const verseUrl = (VERSE_AUDIO && shloka && VERSE_AUDIO[shloka.id]) || '';
   const chapterUrl = (CHAPTER_AUDIO && CHAPTER_AUDIO[shloka.chapter]) || '';
+  const audioUrl = verseUrl || chapterUrl;
+  const isVerseAudio = !!verseUrl;
 
   // Stop everything when the verse changes or component unmounts.
   useEffect(() => {
@@ -58,7 +64,7 @@ export default function VerseAudio({ shloka, onUpgrade }) {
       }
       setLoading(true);
       await setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: false });
-      const player = createAudioPlayer({ uri: chapterUrl });
+      const player = createAudioPlayer({ uri: audioUrl });
       soundRef.current = player;
       player.addListener('playbackStatusUpdate', (s) => {
         if (!s || !s.isLoaded) return;
@@ -92,10 +98,12 @@ export default function VerseAudio({ shloka, onUpgrade }) {
 
       {/* Premium authentic chapter recitation */}
       {isPremium ? (
-        chapterUrl ? (
+        audioUrl ? (
           <View style={styles.premiumBox}>
             <Text style={styles.premiumTitle}>
-              {hiFirst ? `अध्याय ${shloka.chapter} का पाठ` : `Chapter ${shloka.chapter} recitation`} 🪔
+              {isVerseAudio
+                ? (hiFirst ? `श्लोक ${shloka.chapter}.${shloka.verse} का पाठ` : `Verse ${shloka.chapter}.${shloka.verse} recitation`)
+                : (hiFirst ? `अध्याय ${shloka.chapter} का पाठ` : `Chapter ${shloka.chapter} recitation`)} 🪔
             </Text>
             <TouchableOpacity style={styles.playRow} activeOpacity={0.85} onPress={toggleChapter}>
               {loading ? (

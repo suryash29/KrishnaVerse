@@ -9,6 +9,7 @@ const STORAGE_KEY = 'krishnaverse_v1';
 const defaultState = {
   darkMode: false,
   language: 'en',
+  phone: '', // optional contact number captured at sign-up / editable in profile
   bookmarks: [],
   notes: {},
   journal: [],
@@ -46,9 +47,9 @@ export function AppProvider({ children }) {
   // Persist locally on every state change
   useEffect(() => {
     if (!loaded) return;
-    const { darkMode, language, bookmarks, notes, journal, moodHistory, streak, isPremium, japa } = state;
+    const { darkMode, language, phone, bookmarks, notes, journal, moodHistory, streak, isPremium, japa } = state;
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({
-      darkMode, language, bookmarks, notes, journal, moodHistory, streak, isPremium, japa
+      darkMode, language, phone, bookmarks, notes, journal, moodHistory, streak, isPremium, japa
     })).catch(() => {});
   }, [state, loaded]);
 
@@ -71,9 +72,9 @@ export function AppProvider({ children }) {
   useEffect(() => {
     if (!loaded || !user || !cloudSynced) return;
     if (cloudTimer.current) clearTimeout(cloudTimer.current);
-    const { darkMode, language, bookmarks, notes, journal, moodHistory, streak, isPremium, japa } = state;
+    const { darkMode, language, phone, bookmarks, notes, journal, moodHistory, streak, isPremium, japa } = state;
     cloudTimer.current = setTimeout(() => {
-      saveUserData(user.uid, { darkMode, language, bookmarks, notes, journal, moodHistory, streak, isPremium, japa });
+      saveUserData(user.uid, { darkMode, language, phone, bookmarks, notes, journal, moodHistory, streak, isPremium, japa });
     }, 1200);
     return () => { if (cloudTimer.current) clearTimeout(cloudTimer.current); };
   }, [state, loaded, user, cloudSynced]);

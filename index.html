@@ -569,6 +569,9 @@
           <label class="auth-label">Email</label>
           <input type="email" id="regEmail" class="auth-input" placeholder="your@email.com" autocomplete="email" />
 
+          <label class="auth-label">Phone <span style="font-weight:400;text-transform:none;opacity:.6">(optional)</span></label>
+          <input type="tel" id="regPhone" class="auth-input" placeholder="+91 98765 43210" autocomplete="tel" />
+
           <label class="auth-label">Password</label>
           <div class="auth-pass-row">
             <input type="password" id="regPassword" class="auth-input" placeholder="Min. 6 characters" autocomplete="new-password" oninput="updatePasswordStrength(this.value)" />
@@ -627,6 +630,8 @@
   <script src="auth.js"></script>
   <script src="shop-data.js"></script>
   <script src="data/gita-verses.js"></script>
+  <script src="data/word-by-word.js"></script>
+  <script src="data/verse-audio.js"></script>
   <script src="data/shlokas.js"></script>
   <script src="app.js"></script>
 </body>

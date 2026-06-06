@@ -226,13 +226,21 @@
   window.handleRegister = async function () {
     var name = document.getElementById('regName').value.trim();
     var email = document.getElementById('regEmail').value.trim();
+    var phoneEl = document.getElementById('regPhone');
+    var phone = phoneEl ? phoneEl.value.trim() : '';
     var password = document.getElementById('regPassword').value;
     var confirm = document.getElementById('regConfirm').value;
     var errorEl = document.getElementById('registerError');
     var btn = document.getElementById('registerBtn');
 
     if (!name || !email || !password || !confirm) {
-      showAuthError(errorEl, 'Please fill in all fields.');
+      showAuthError(errorEl, 'Please fill in your name, email and password.');
+      return;
+    }
+    // Phone is OPTIONAL, but if provided it must look like a real number.
+    var phoneClean = phone.replace(/[\s\-()]/g, '');
+    if (phoneClean && !/^\+?\d{7,15}$/.test(phoneClean)) {
+      showAuthError(errorEl, 'Enter a valid phone number (7–15 digits), or leave it blank.');
       return;
     }
     if (password.length < 6) {
@@ -251,6 +259,11 @@
     try {
       var cred = await auth.createUserWithEmailAndPassword(email, password);
       await cred.user.updateProfile({ displayName: name });
+      // Persist the optional phone to local + cloud state.
+      if (phoneClean && typeof STATE !== 'undefined') {
+        STATE.phone = phoneClean;
+        if (typeof saveState === 'function') saveState();
+      }
       // Send a verification email so the account can be confirmed.
       try { await cred.user.sendEmailVerification(); } catch (e) {}
     } catch (err) {
@@ -386,6 +399,7 @@
       case 'auth/too-many-requests': return 'Too many attempts. Please wait a moment.';
       case 'auth/network-request-failed': return 'Network error. Check your connection.';
       case 'auth/invalid-credential': return 'Invalid email or password.';
+      case 'auth/operation-not-allowed': return 'Email sign-up is currently disabled. Please contact support.';
       default: return 'Something went wrong. Please try again.';
     }
   }

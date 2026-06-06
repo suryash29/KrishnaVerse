@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
   StyleSheet, Alert,
@@ -14,18 +14,38 @@ import PremiumSheet from '../../components/PremiumSheet';
 
 export default function ProfileScreen() {
   const { user, logout, resendVerification, updateDisplayName, changePassword } = useAuth();
-  const { bookmarks, journal, streak, isPremium, language } = useApp();
+  const { bookmarks, journal, streak, isPremium, language, phone, update } = useApp();
   const hiFirst = language === 'hi';
   const [showPremium, setShowPremium] = useState(false);
 
   const [name, setName] = useState(user?.displayName || '');
   const [savingName, setSavingName] = useState(false);
+  const [phoneVal, setPhoneVal] = useState(phone || '');
+  const [savingPhone, setSavingPhone] = useState(false);
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [changing, setChanging] = useState(false);
 
   const initial = (user?.displayName || user?.email || 'U')[0].toUpperCase();
   const verified = !!user?.emailVerified;
+
+  // Keep the editable field in sync when cloud data loads/changes.
+  useEffect(() => { setPhoneVal(phone || ''); }, [phone]);
+
+  function onSavePhone() {
+    const clean = phoneVal.replace(/[\s\-()]/g, '');
+    if (clean && !/^\+?\d{7,15}$/.test(clean)) {
+      Alert.alert('Invalid phone', 'Enter a valid phone number (7–15 digits), or leave it blank.');
+      return;
+    }
+    setSavingPhone(true);
+    try {
+      update({ phone: clean });
+      Alert.alert('Saved', clean ? 'Your phone number has been updated.' : 'Your phone number has been removed.');
+    } finally {
+      setSavingPhone(false);
+    }
+  }
 
   async function onSaveName() {
     const trimmed = name.trim();
@@ -123,6 +143,25 @@ export default function ProfileScreen() {
             <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Your name" placeholderTextColor={Colors.textMuted} />
             <TouchableOpacity style={styles.btn} onPress={onSaveName} disabled={savingName}>
               <Text style={styles.btnText}>{savingName ? '...' : 'Save'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>PHONE (OPTIONAL)</Text>
+          <View style={styles.row}>
+            <TextInput
+              style={styles.input}
+              value={phoneVal}
+              onChangeText={setPhoneVal}
+              placeholder="+91 98765 43210"
+              placeholderTextColor={Colors.textMuted}
+              keyboardType="phone-pad"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <TouchableOpacity style={styles.btn} onPress={onSavePhone} disabled={savingPhone}>
+              <Text style={styles.btnText}>{savingPhone ? '...' : 'Save'}</Text>
             </TouchableOpacity>
           </View>
         </View>

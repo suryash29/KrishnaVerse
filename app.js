@@ -125,6 +125,7 @@ const STATE = {
   previousScreen: null,
   language: 'en',      // 'en' | 'hi' | 'sa'
   darkMode: false,
+  phone: '',           // optional contact number (captured at sign-up / editable)
   bookmarks: [],       // [shlokaId, ...]
   notes: {},           // {shlokaId: text}
   journal: [],         // [{id, date, mood, text}]
@@ -155,6 +156,7 @@ function saveState() {
   const data = {
     language: STATE.language,
     darkMode: STATE.darkMode,
+    phone: STATE.phone,
     bookmarks: STATE.bookmarks,
     notes: STATE.notes,
     journal: STATE.journal,
@@ -177,6 +179,7 @@ function scheduleCloudSave() {
     window.__kvCloud.save(STATE.userId, {
       language: STATE.language,
       darkMode: STATE.darkMode,
+      phone: STATE.phone,
       bookmarks: STATE.bookmarks,
       notes: STATE.notes,
       journal: STATE.journal,
@@ -224,6 +227,7 @@ function mergeCloudIntoState(cloud) {
   }
   if (typeof cloud.darkMode === 'boolean') STATE.darkMode = cloud.darkMode;
   if (cloud.language) STATE.language = cloud.language;
+  if (cloud.phone) STATE.phone = cloud.phone;
   // Premium entitlement: once true anywhere, it stays true (cloud is source of truth).
   if (cloud.isPremium === true) STATE.isPremium = true;
   // Japa: keep the larger lifetime total; cloud preferences win for mantra/toggles.
@@ -275,6 +279,7 @@ function loadState() {
     const d = JSON.parse(raw);
     STATE.language = d.language || 'en';
     STATE.darkMode = d.darkMode || false;
+    STATE.phone = d.phone || '';
     STATE.bookmarks = d.bookmarks || [];
     STATE.notes = d.notes || {};
     STATE.journal = d.journal || [];
@@ -892,33 +897,16 @@ function openShlokaDetail(shloka) {
   };
 
   const hasWBW = Array.isArray(shloka.wordByWord) && shloka.wordByWord.length;
+  const wbwLabel = `<div class="sd-section-label">${hiFirst ? 'शब्दार्थ (Word by Word)' : 'Word by Word · शब्दार्थ'}</div>`;
 
+  // Word-by-word is a Premium feature for ALL verses. Non-premium users always
+  // see the upgrade lock; premium users see the authentic breakdown when it
+  // exists, otherwise a "being prepared" note.
   let wordByWordHTML = '';
-  if (hasWBW) {
-    // Curated (free) verse — full bilingual word-by-word.
+  if (!STATE.isPremium) {
+    // Free user — locked upsell card.
     wordByWordHTML = `
-    <div class="sd-section-label">${hiFirst ? 'शब्दार्थ (Word by Word)' : 'Word by Word · शब्दार्थ'}</div>
-    <div class="sd-word-grid">
-      ${shloka.wordByWord.map(w => `
-        <div class="sd-word-chip">
-          <span class="sdw-word">${w.w}</span>
-          ${wordMeaningHTML(w)}
-        </div>
-      `).join('')}
-    </div>`;
-  } else if (STATE.isPremium) {
-    // Premium member, but this non-curated verse has no authored word-by-word yet.
-    wordByWordHTML = `
-    <div class="sd-section-label">${hiFirst ? 'शब्दार्थ (Word by Word)' : 'Word by Word · शब्दार्थ'}</div>
-    <div class="sd-box" style="border-left-color:var(--gold)">
-      <p>${hiFirst
-        ? 'इस श्लोक का विस्तृत शब्दार्थ तैयार किया जा रहा है। तब तक नीचे पूरा अनुवाद उपलब्ध है। 🙏'
-        : 'A detailed word-by-word breakdown for this verse is being prepared. The full translation is available below. 🙏'}</p>
-    </div>`;
-  } else {
-    // Free user on a non-curated verse — locked upsell card.
-    wordByWordHTML = `
-    <div class="sd-section-label">${hiFirst ? 'शब्दार्थ (Word by Word)' : 'Word by Word · शब्दार्थ'}</div>
+    ${wbwLabel}
     <div class="sd-premium-lock" onclick="requestPremiumUpgrade()">
       <div class="sd-lock-icon">🔒</div>
       <div class="sd-lock-body">
@@ -928,6 +916,27 @@ function openShlokaDetail(shloka) {
           : 'Sanskrit word meanings (Hindi + English) for all 700 verses — with KrishnaVerse Premium.'}</div>
         <div class="sd-lock-cta">${hiFirst ? 'प्रीमियम लें · ₹199/वर्ष' : 'Go Premium · ₹199/year'} →</div>
       </div>
+    </div>`;
+  } else if (hasWBW) {
+    // Premium member — full bilingual word-by-word.
+    wordByWordHTML = `
+    ${wbwLabel}
+    <div class="sd-word-grid">
+      ${shloka.wordByWord.map(w => `
+        <div class="sd-word-chip">
+          <span class="sdw-word">${w.w}</span>
+          ${wordMeaningHTML(w)}
+        </div>
+      `).join('')}
+    </div>`;
+  } else {
+    // Premium member, but this verse has no word-by-word yet.
+    wordByWordHTML = `
+    ${wbwLabel}
+    <div class="sd-box" style="border-left-color:var(--gold)">
+      <p>${hiFirst
+        ? 'इस श्लोक का विस्तृत शब्दार्थ तैयार किया जा रहा है। तब तक नीचे पूरा अनुवाद उपलब्ध है। 🙏'
+        : 'A detailed word-by-word breakdown for this verse is being prepared. The full translation is available below. 🙏'}</p>
     </div>`;
   }
 
@@ -950,13 +959,20 @@ function openShlokaDetail(shloka) {
       <span class="sd-listen-ico">🔊</span> <span class="tts-label">${hiFirst ? 'सुनें' : 'Listen'}</span>
     </button>` : '';
 
+  // Prefer authentic per-verse recitation (gita/gita), fall back to a configured
+  // full-chapter recitation. Either is the Premium upgrade over free TTS.
+  const verseUrl = (window.KV_VERSE_AUDIO && window.KV_VERSE_AUDIO[shloka.id]) || '';
   const chapterUrl = (window.CHAPTER_AUDIO && window.CHAPTER_AUDIO[shloka.chapter]) || '';
+  const audioUrl = verseUrl || chapterUrl;
+  const audioTitle = verseUrl
+    ? (hiFirst ? `श्लोक ${shloka.chapter}.${shloka.verse} का पाठ` : `Verse ${shloka.chapter}.${shloka.verse} recitation`)
+    : (hiFirst ? `अध्याय ${shloka.chapter} का पाठ` : `Chapter ${shloka.chapter} recitation`);
   let chapterAudioHTML = '';
   if (STATE.isPremium) {
-    chapterAudioHTML = chapterUrl ? `
+    chapterAudioHTML = audioUrl ? `
       <div class="sd-audio-premium">
-        <div class="sd-audio-title">${hiFirst ? `अध्याय ${shloka.chapter} का पाठ` : `Chapter ${shloka.chapter} recitation`} 🪔</div>
-        <audio controls preload="none" style="width:100%" src="${chapterUrl}"></audio>
+        <div class="sd-audio-title">${audioTitle} 🪔</div>
+        <audio controls preload="none" style="width:100%" src="${audioUrl}"></audio>
       </div>` : `
       <div class="sd-box" style="border-left-color:var(--gold)"><p>${hiFirst
         ? `अध्याय ${shloka.chapter} का प्रामाणिक पाठ शीघ्र जोड़ा जाएगा। 🙏`
@@ -2323,6 +2339,14 @@ function openProfileModal() {
       </div>
     </div>
 
+    <div class="pf-section">
+      <label class="pf-label">Phone <span style="font-weight:400;opacity:.6">(optional)</span></label>
+      <div class="pf-row">
+        <input type="tel" id="pfPhone" class="pf-input" placeholder="+91 98765 43210" value="${(STATE.phone || '').replace(/"/g, '&quot;')}" />
+        <button class="pf-btn" onclick="saveProfilePhone()">Save</button>
+      </div>
+    </div>
+
     ${verified ? '' : `
     <div class="pf-section">
       <button class="pf-btn pf-btn-outline" onclick="resendVerify()">📧 Resend verification email</button>
@@ -2382,6 +2406,19 @@ async function saveProfileName() {
   }
 }
 window.saveProfileName = saveProfileName;
+
+function saveProfilePhone() {
+  const raw = (document.getElementById('pfPhone').value || '').trim();
+  const clean = raw.replace(/[\s\-()]/g, '');
+  if (clean && !/^\+?\d{7,15}$/.test(clean)) {
+    _pfMsg('Enter a valid phone number (7–15 digits), or leave it blank.', false);
+    return;
+  }
+  STATE.phone = clean;
+  saveState(); // persists locally + schedules cloud sync
+  _pfMsg(clean ? '✓ Phone updated.' : '✓ Phone removed.', true);
+}
+window.saveProfilePhone = saveProfilePhone;
 
 async function resendVerify() {
   try { await window.__kvSendVerify(); _pfMsg('✓ Verification email sent.', true); }

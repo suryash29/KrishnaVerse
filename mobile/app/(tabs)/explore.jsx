@@ -213,56 +213,50 @@ export default function ExploreScreen() {
 
               <VerseAudio shloka={selectedShloka} onUpgrade={() => setShowPremium(true)} />
 
-              {/* Word by Word — free for curated verses, premium gate otherwise */}
-              {Array.isArray(selectedShloka.wordByWord) && selectedShloka.wordByWord.length > 0 ? (
-                <>
-                  <Text style={styles.modalLabel}>{hiFirst ? 'शब्दार्थ · WORD BY WORD' : 'WORD BY WORD · शब्दार्थ'}</Text>
-                  <View style={styles.wbwGrid}>
-                    {selectedShloka.wordByWord.map((w, i) => {
-                      const en = w.en != null ? w.en : (w.m != null ? w.m : '');
-                      const hi = w.hi != null ? w.hi : '';
-                      return (
-                        <View key={i} style={styles.wbwChip}>
-                          <Text style={styles.wbwWord}>{w.w}</Text>
-                          {hiFirst ? (
-                            <>
-                              {!!hi && <Text style={styles.wbwHi}>{hi}</Text>}
-                              {!!en && <Text style={styles.wbwEn}>{en}</Text>}
-                            </>
-                          ) : (
-                            <>
-                              {!!en && <Text style={styles.wbwEn}>{en}</Text>}
-                              {!!hi && <Text style={styles.wbwHi}>{hi}</Text>}
-                            </>
-                          )}
-                        </View>
-                      );
-                    })}
+              {/* Word by Word — Premium for ALL verses. Non-premium users always
+                  see the upgrade lock. Premium users see the authentic breakdown
+                  when available, else a "being prepared" note. */}
+              <Text style={styles.modalLabel}>{hiFirst ? 'शब्दार्थ · WORD BY WORD' : 'WORD BY WORD · शब्दार्थ'}</Text>
+              {!isPremium ? (
+                <TouchableOpacity style={styles.lockCard} activeOpacity={0.85} onPress={() => setShowPremium(true)}>
+                  <Text style={styles.lockIcon}>🔒</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.lockTitle}>{hiFirst ? 'हर शब्द का अर्थ अनलॉक करें' : 'Unlock word-by-word meaning'}</Text>
+                    <Text style={styles.lockSub}>{hiFirst
+                      ? 'सभी 700 श्लोकों का संस्कृत-शब्दार्थ (हिंदी + अंग्रेज़ी)।'
+                      : 'Sanskrit word meanings (Hindi + English) for all 700 verses.'}</Text>
+                    <Text style={styles.lockCta}>{hiFirst ? 'प्रीमियम लें · ₹199/वर्ष →' : 'Go Premium · ₹199/year →'}</Text>
                   </View>
-                </>
-              ) : isPremium ? (
-                <>
-                  <Text style={styles.modalLabel}>{hiFirst ? 'शब्दार्थ · WORD BY WORD' : 'WORD BY WORD · शब्दार्थ'}</Text>
-                  <View style={styles.applicationBox}>
-                    <Text style={styles.applicationText}>{hiFirst
-                      ? 'इस श्लोक का विस्तृत शब्दार्थ तैयार किया जा रहा है। तब तक नीचे पूरा अनुवाद उपलब्ध है। 🙏'
-                      : 'A detailed word-by-word breakdown for this verse is being prepared. The full translation is available below. 🙏'}</Text>
-                  </View>
-                </>
+                </TouchableOpacity>
+              ) : Array.isArray(selectedShloka.wordByWord) && selectedShloka.wordByWord.length > 0 ? (
+                <View style={styles.wbwGrid}>
+                  {selectedShloka.wordByWord.map((w, i) => {
+                    const en = w.en != null ? w.en : (w.m != null ? w.m : '');
+                    const hi = w.hi != null ? w.hi : '';
+                    return (
+                      <View key={i} style={styles.wbwChip}>
+                        <Text style={styles.wbwWord}>{w.w}</Text>
+                        {hiFirst ? (
+                          <>
+                            {!!hi && <Text style={styles.wbwHi}>{hi}</Text>}
+                            {!!en && <Text style={styles.wbwEn}>{en}</Text>}
+                          </>
+                        ) : (
+                          <>
+                            {!!en && <Text style={styles.wbwEn}>{en}</Text>}
+                            {!!hi && <Text style={styles.wbwHi}>{hi}</Text>}
+                          </>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
               ) : (
-                <>
-                  <Text style={styles.modalLabel}>{hiFirst ? 'शब्दार्थ · WORD BY WORD' : 'WORD BY WORD · शब्दार्थ'}</Text>
-                  <TouchableOpacity style={styles.lockCard} activeOpacity={0.85} onPress={() => setShowPremium(true)}>
-                    <Text style={styles.lockIcon}>🔒</Text>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.lockTitle}>{hiFirst ? 'हर शब्द का अर्थ अनलॉक करें' : 'Unlock word-by-word meaning'}</Text>
-                      <Text style={styles.lockSub}>{hiFirst
-                        ? 'सभी 700 श्लोकों का संस्कृत-शब्दार्थ (हिंदी + अंग्रेज़ी)।'
-                        : 'Sanskrit word meanings (Hindi + English) for all 700 verses.'}</Text>
-                      <Text style={styles.lockCta}>{hiFirst ? 'प्रीमियम लें · ₹199/वर्ष →' : 'Go Premium · ₹199/year →'}</Text>
-                    </View>
-                  </TouchableOpacity>
-                </>
+                <View style={styles.applicationBox}>
+                  <Text style={styles.applicationText}>{hiFirst
+                    ? 'इस श्लोक का विस्तृत शब्दार्थ तैयार किया जा रहा है। तब तक नीचे पूरा अनुवाद उपलब्ध है। 🙏'
+                    : 'A detailed word-by-word breakdown for this verse is being prepared. The full translation is available below. 🙏'}</Text>
+                </View>
               )}
 
               <Text style={styles.modalLabel}>{hiFirst ? 'अनुवाद · TRANSLATION' : 'TRANSLATION · अनुवाद'}</Text>

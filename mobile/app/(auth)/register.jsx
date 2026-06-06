@@ -7,22 +7,31 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
+import { useApp } from '../../context/AppContext';
 import { Colors } from '../../constants/Colors';
 import { StatusBar } from 'expo-status-bar';
 
 export default function RegisterScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
+  const { update } = useApp();
   const router = useRouter();
 
   async function handleRegister() {
     if (!name.trim() || !email.trim() || !password || !confirm) {
-      Alert.alert('Missing Fields', 'Please fill in all fields.');
+      Alert.alert('Missing Fields', 'Please fill in your name, email and password.');
+      return;
+    }
+    // Phone is OPTIONAL, but if provided it must look like a real number.
+    const phoneClean = phone.replace(/[\s\-()]/g, '');
+    if (phoneClean && !/^\+?\d{7,15}$/.test(phoneClean)) {
+      Alert.alert('Invalid Phone', 'Enter a valid phone number (7–15 digits), or leave it blank.');
       return;
     }
     if (password.length < 6) {
@@ -36,9 +45,11 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       await register(email.trim(), password, name.trim());
+      // Persist the optional phone to the user's profile (synced to cloud).
+      if (phoneClean) update({ phone: phoneClean });
       // Auth gate navigates to tabs automatically
     } catch (err) {
-      Alert.alert('Registration Failed', getErrorMessage(err.code));
+      Alert.alert('Registration Failed', getErrorMessage(err && err.code));
     } finally {
       setLoading(false);
     }
@@ -91,6 +102,20 @@ export default function RegisterScreen() {
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="next"
+            />
+
+            {/* Phone (optional) */}
+            <Text style={styles.label}>Phone <Text style={styles.optional}>(optional)</Text></Text>
+            <TextInput
+              style={styles.input}
+              placeholder="+91 98765 43210"
+              placeholderTextColor={Colors.textMuted}
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
               autoCapitalize="none"
               autoCorrect={false}
               returnKeyType="next"
@@ -195,10 +220,14 @@ export default function RegisterScreen() {
 
 function getErrorMessage(code) {
   switch (code) {
-    case 'auth/email-already-in-use': return 'An account with this email already exists.';
+    case 'auth/email-already-in-use': return 'An account with this email already exists. Try signing in instead.';
     case 'auth/invalid-email': return 'Please enter a valid email address.';
     case 'auth/weak-password': return 'Password is too weak. Use at least 6 characters.';
-    case 'auth/network-request-failed': return 'Network error. Check your connection.';
+    case 'auth/network-request-failed': return 'Network error. Check your internet connection and try again.';
+    case 'auth/operation-not-allowed': return 'Email sign-up is currently disabled. Please contact support.';
+    case 'auth/too-many-requests': return 'Too many attempts. Please wait a moment and try again.';
+    case 'auth/invalid-credential': return 'The sign-up details are invalid. Please check and try again.';
+    case 'auth/internal-error': return 'Something went wrong on our side. Please try again.';
     default: return 'Registration failed. Please try again.';
   }
 }
@@ -262,6 +291,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     letterSpacing: 0.5,
     textTransform: 'uppercase',
+  },
+  optional: {
+    color: Colors.textMuted,
+    fontWeight: '400',
+    textTransform: 'none',
+    letterSpacing: 0,
   },
   input: {
     backgroundColor: '#2E1F0D',

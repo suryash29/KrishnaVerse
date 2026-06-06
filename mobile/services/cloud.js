@@ -112,6 +112,7 @@ export function mergeCloudIntoState(local, cloud) {
   }
   if (typeof cloud.darkMode === 'boolean') out.darkMode = cloud.darkMode;
   if (cloud.language) out.language = cloud.language;
+  if (cloud.phone) out.phone = cloud.phone;
   // Premium entitlement: once true anywhere, it stays true.
   if (cloud.isPremium === true) out.isPremium = true;
   // Japa: keep larger lifetime total; newer device wins today's tally.
