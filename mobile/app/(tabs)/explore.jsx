@@ -159,6 +159,10 @@ export default function ExploreScreen() {
           keyExtractor={item => item.id}
           contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 40 }}
           renderItem={({ item }) => <ShlokaItem item={item} />}
+          initialNumToRender={12}
+          maxToRenderPerBatch={12}
+          windowSize={7}
+          removeClippedSubviews
         />
       )}
 

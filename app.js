@@ -384,10 +384,50 @@ function renderTopicsGrid() {
   }).join('');
 }
 
+// ── Paginated "All Shlokas" (avoid rendering all 700 cards at once) ──
+const ALL_SHLOKAS_PAGE = 30;
+let allShlokasShown = 0;
+let allShlokasObserver = null;
+
 function renderAllShlokasList() {
   const el = document.getElementById('allShlokasList');
   if (!el) return;
-  el.innerHTML = SHLOKAS.map(s => renderShlokaListCard(s)).join('');
+  el.innerHTML = '';
+  allShlokasShown = 0;
+  appendAllShlokas();
+  setupAllShlokasObserver();
+}
+
+function appendAllShlokas() {
+  const el = document.getElementById('allShlokasList');
+  if (!el) return;
+  const next = SHLOKAS.slice(allShlokasShown, allShlokasShown + ALL_SHLOKAS_PAGE);
+  el.insertAdjacentHTML('beforeend', next.map(s => renderShlokaListCard(s)).join(''));
+  allShlokasShown += next.length;
+
+  const moreBtn = document.getElementById('allShlokasMore');
+  if (moreBtn) {
+    const remaining = SHLOKAS.length - allShlokasShown;
+    if (remaining > 0) {
+      moreBtn.style.display = '';
+      moreBtn.textContent = `Load more (${remaining} remaining)`;
+    } else {
+      moreBtn.style.display = 'none';
+    }
+  }
+}
+
+// Infinite scroll: auto-load the next page when the sentinel scrolls into view.
+function setupAllShlokasObserver() {
+  const sentinel = document.getElementById('allShlokasSentinel');
+  if (!sentinel || typeof IntersectionObserver === 'undefined') return;
+  if (allShlokasObserver) allShlokasObserver.disconnect();
+  allShlokasObserver = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting && allShlokasShown < SHLOKAS.length) appendAllShlokas();
+    });
+  }, { rootMargin: '400px' });
+  allShlokasObserver.observe(sentinel);
 }
 
 function renderShlokaListCard(shloka) {
