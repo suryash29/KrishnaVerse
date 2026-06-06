@@ -9,6 +9,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useAuth } from '../../context/AuthContext';
 import { useApp } from '../../context/AppContext';
 import { Colors } from '../../constants/Colors';
+import { KV_CONFIG } from '../../constants/Config';
 import PremiumSheet from '../../components/PremiumSheet';
 
 export default function ProfileScreen() {
@@ -149,6 +150,8 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
+        <Text style={styles.version}>KrishnaVerse v{KV_CONFIG.appVersion || '1.1.0'}</Text>
+
         <View style={{ height: 40 }} />
       </ScrollView>
 
@@ -210,4 +213,5 @@ const styles = StyleSheet.create({
   btnOutlineText: { color: Colors.primary, fontWeight: '700' },
   signOut: { borderWidth: 1, borderColor: '#C0392B', borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
   signOutText: { color: '#C0392B', fontWeight: '700' },
+  version: { textAlign: 'center', fontSize: 12, color: Colors.textMuted, marginTop: 10, letterSpacing: 0.4 },
 });

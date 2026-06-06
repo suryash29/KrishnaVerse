@@ -22,6 +22,7 @@ const KV_CONFIG = {
   },
   premiumUpi:   'krishnaverse@upi', // TODO: set real UPI ID for ₹199/yr Premium
   premiumPrice: 199,                // ₹/year
+  appVersion:   '1.1.0',            // single source of truth — keep in sync everywhere
 };
 window.KV_CONFIG = KV_CONFIG;
 
@@ -2337,6 +2338,8 @@ function openProfileModal() {
     <div id="pfMsg" class="pf-msg hidden"></div>
 
     <button class="pf-signout" onclick="window._handleSignOut()">Sign Out</button>
+
+    <div class="pf-version">KrishnaVerse v${(window.KV_CONFIG && window.KV_CONFIG.appVersion) || '1.1.0'}</div>
   `;
   document.getElementById('profileModal').classList.remove('hidden');
 }

@@ -1713,6 +1713,11 @@ svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; 
   color: #C0392B; border: 1px solid #C0392B; padding: 10px;
   border-radius: 10px; font-weight: 600; cursor: pointer;
 }
+.pf-version {
+  margin-top: 14px; text-align: center; font-size: 12px;
+  color: #9a8f80; letter-spacing: 0.4px;
+}
+body.dark-mode .pf-version { color: rgba(255,255,255,0.4); }
 body.dark-mode .pf-input { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.2); }
 body.dark-mode .kv-verify-notice { background: #3a2c10; color: #FFD79A; border-color: #6b5320; }
 

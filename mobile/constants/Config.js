@@ -14,6 +14,7 @@ export const KV_CONFIG = {
   },
   premiumUpi: 'krishnaverse@upi', // TODO: set real UPI ID for ₹199/yr Premium
   premiumPrice: 199,              // ₹/year
+  appVersion: '1.1.0',            // single source of truth — keep in sync everywhere
 };
 
 // ╔══════════════════════════════════════════════════════════════╗
