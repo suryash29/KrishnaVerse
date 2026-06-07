@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#E8690A" />
+  <meta name="description" content="KrishnaVerse – Your personal spiritual companion. Daily Bhagavad Gita wisdom, AI guide, mood tracking, and reflection tools." />
+  <link rel="canonical" href="https://krishnaverse.online/" />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://krishnaverse.online/" />
+  <meta property="og:site_name" content="KrishnaVerse" />
+  <meta property="og:title" content="KrishnaVerse – Daily Gita Wisdom" />
+  <meta property="og:description" content="Daily Bhagavad Gita wisdom, AI Krishna guide, mood tracking & personal reflection journal. Free PWA — works offline." />
+  <meta property="og:image" content="https://krishnaverse.online/og-image.png" />
+  <meta property="og:locale" content="en_IN" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:url" content="https://krishnaverse.online/" />
+  <meta name="twitter:title" content="KrishnaVerse – Daily Gita Wisdom" />
+  <meta name="twitter:description" content="Daily Bhagavad Gita wisdom, AI Krishna guide, mood tracking & personal reflection journal." />
+  <meta name="twitter:image" content="https://krishnaverse.online/og-image.png" />
+
+  <!-- PWA / Mobile -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="KrishnaVerse" />
+  <title>KrishnaVerse – Daily Gita Wisdom</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&family=Noto+Sans+Devanagari:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="light-mode">
+
+  <!-- Auth Overlay shown by default; splash/app shown only after auth -->
+  <!-- Splash Screen -->
+  <div id="splash" class="splash hidden">
+    <div class="splash-bg"></div>
+    <div class="splash-mandala"></div>
+    <div class="splash-content">
+      <div class="splash-om">ॐ</div>
+      <h1 class="splash-title">KrishnaVerse</h1>
+      <p class="splash-sub">Daily Gita Wisdom</p>
+      <div class="splash-loader"><span></span><span></span><span></span></div>
+    </div>
+  </div>
+
+  <!-- Main App Shell -->
+  <div id="app" class="app hidden">
+
+    <!-- Top Header -->
+    <header class="app-header" id="appHeader">
+      <button class="header-btn" id="backBtn" onclick="goBack()" style="display:none">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="header-center">
+        <span class="header-title" id="headerTitle">KrishnaVerse</span>
+      </div>
+      <div class="header-actions">
+        <div id="headerUserMenu"></div>
+        <button class="header-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle theme">
+          <svg id="themeIcon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+        <button class="header-btn" id="langBtn" onclick="cycleLanguage()" title="Change language">
+          <span id="langLabel">EN</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Screens Container -->
+    <main class="screens-container">
+
+      <!-- ═══════════════ HOME SCREEN ═══════════════ -->
+      <section class="screen active" id="screen-home">
+        <div class="screen-scroll">
+
+          <!-- Greeting Banner -->
+          <div class="greeting-banner">
+            <div class="greeting-left">
+              <p class="greeting-time" id="greetingTime">Good morning</p>
+              <h2 class="greeting-name">Jai Shri Krishna 🙏</h2>
+            </div>
+            <div class="streak-badge">
+              <span class="streak-fire">🔥</span>
+              <span class="streak-num" id="streakCount">0</span>
+              <span class="streak-label">day streak</span>
+            </div>
+          </div>
+
+          <!-- Daily Shloka Card -->
+          <div class="section-label">TODAY'S WISDOM</div>
+          <div class="daily-shloka-card" id="dailyShlokaCard">
+            <div class="shloka-card-header">
+              <span class="shloka-ref" id="dailyRef">BG 2.47</span>
+              <div class="shloka-card-actions">
+                <button class="card-action-btn" id="dailyBookmarkBtn" onclick="toggleBookmarkDaily()" title="Bookmark">
+                  <svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+                </button>
+                <button class="card-action-btn" onclick="shareDaily()" title="Share">
+                  <svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="shloka-chapter-tag" id="dailyChapter">Chapter 2 · Sankhya Yoga</div>
+            <div class="shloka-sanskrit" id="dailySanskrit">Loading...</div>
+            <div class="shloka-transliteration" id="dailyTranslit"></div>
+            <div class="shloka-divider"><span class="lotus-sep">❁</span></div>
+            <div class="shloka-translation" id="dailyTranslation">Loading today's wisdom...</div>
+            <button class="read-more-btn" onclick="openShlokaDetail(getTodayShloka())">Read Full Teaching →</button>
+          </div>
+
+          <!-- Mood Check-In -->
+          <div class="section-label">HOW ARE YOU FEELING?</div>
+          <div class="mood-checkin-card">
+            <p class="mood-prompt">Your mood shapes the wisdom you need today</p>
+            <div class="mood-grid" id="homeMoodGrid"></div>
+          </div>
+
+          <!-- Quick Actions -->
+          <div class="section-label">EXPLORE</div>
+          <div class="quick-actions-grid">
+            <button class="quick-action-card" onclick="navigateTo('guide')">
+              <span class="qa-icon">🤖</span>
+              <span class="qa-label">Ask Krishna</span>
+              <span class="qa-desc">AI Guide</span>
+            </button>
+            <button class="quick-action-card" onclick="navigateTo('explore')">
+              <span class="qa-icon">📖</span>
+              <span class="qa-label">Library</span>
+              <span class="qa-desc">All Shlokas</span>
+            </button>
+            <button class="quick-action-card" onclick="startGuidedReflection()">
+              <span class="qa-icon">🧘</span>
+              <span class="qa-label">Reflect</span>
+              <span class="qa-desc">Daily Session</span>
+            </button>
+            <button class="quick-action-card" onclick="navigateTo('reflect'); switchReflectTab('bookmarks', document.querySelector('#screen-reflect .exp-tab:nth-child(2)'))">
+              <span class="qa-icon">🔖</span>
+              <span class="qa-label">Saved</span>
+              <span class="qa-desc">Bookmarks</span>
+            </button>
+            <button class="quick-action-card" onclick="navigateTo('shop')">
+              <span class="qa-icon">🐄</span>
+              <span class="qa-label">GoSeva</span>
+              <span class="qa-desc">Donate</span>
+            </button>
+            <button class="quick-action-card" onclick="navigateTo('shop')">
+              <span class="qa-icon">🛕</span>
+              <span class="qa-label">Spiritual Shop</span>
+              <span class="qa-desc">Books & Puja</span>
+            </button>
+          </div>
+
+          <!-- Situation Wisdom -->
+          <div class="section-label">WISDOM FOR YOUR SITUATION</div>
+          <div class="situation-scroll" id="situationScroll"></div>
+
+          <!-- Recent Journal -->
+          <div class="section-label">YOUR JOURNEY</div>
+          <div class="journey-card" id="journeyCard">
+            <div class="journey-stats">
+              <div class="j-stat"><span class="j-num" id="jShlokas">0</span><span class="j-label">Shlokas</span></div>
+              <div class="j-stat"><span class="j-num" id="jDays">0</span><span class="j-label">Days</span></div>
+              <div class="j-stat"><span class="j-num" id="jNotes">0</span><span class="j-label">Notes</span></div>
+            </div>
+            <div class="achievements-row" id="achievementsRow"></div>
+          </div>
+
+          <div class="bottom-spacer"></div>
+        </div>
+      </section>
+
+      <!-- ═══════════════ GUIDE SCREEN ═══════════════ -->
+      <section class="screen" id="screen-guide">
+        <div class="guide-container">
+          <div class="guide-header">
+            <div class="krishna-avatar">
+              <div class="avatar-inner">🪈</div>
+            </div>
+            <div class="guide-intro">
+              <h3>KrishnaVerse Guide</h3>
+              <p>Ask me anything about life, and I will respond with Gita wisdom</p>
+            </div>
+          </div>
+          <div class="chat-messages" id="chatMessages">
+            <div class="chat-message bot">
+              <div class="bot-avatar">🪈</div>
+              <div class="message-bubble">
+                <p>Namaste 🙏 I am here to help you find wisdom from the Bhagavad Gita.</p>
+                <p>You can ask me about anything — stress, relationships, career confusion, fear, anger, or simply seeking meaning. I will guide you with Krishna's eternal teachings.</p>
+                <p><em>What is troubling your heart today?</em></p>
+              </div>
+            </div>
+          </div>
+          <div class="quick-prompts" id="quickPrompts">
+            <button class="qp-btn" onclick="sendQuickPrompt('I feel stressed and overwhelmed')">I feel overwhelmed</button>
+            <button class="qp-btn" onclick="sendQuickPrompt('I am confused about my career path')">Career confusion</button>
+            <button class="qp-btn" onclick="sendQuickPrompt('I am struggling with anger')">Anger issues</button>
+            <button class="qp-btn" onclick="sendQuickPrompt('I feel lost and without purpose')">Feeling lost</button>
+            <button class="qp-btn" onclick="sendQuickPrompt('How do I build better discipline?')">Discipline</button>
+            <button class="qp-btn" onclick="sendQuickPrompt('I am afraid of failure')">Fear of failure</button>
+          </div>
+          <div class="chat-input-area">
+            <input type="text" id="chatInput" class="chat-input" placeholder="Share what's on your heart..." maxlength="300" />
+            <button class="chat-send-btn" onclick="sendMessage()" id="chatSendBtn">
+              <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════════ EXPLORE SCREEN ═══════════════ -->
+      <section class="screen" id="screen-explore">
+        <div class="screen-scroll">
+
+          <!-- Search Bar -->
+          <div class="search-container">
+            <div class="search-bar">
+              <svg class="search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" id="searchInput" class="search-input" placeholder="Search shlokas, topics, chapters..." oninput="handleSearch(this.value)" />
+              <button class="search-clear" id="searchClear" onclick="clearSearch()" style="display:none">✕</button>
+            </div>
+          </div>
+
+          <!-- Search Results (hidden by default) -->
+          <div id="searchResults" class="search-results hidden"></div>
+
+          <!-- Browse Tabs -->
+          <div class="explore-tabs" id="exploreTabs">
+            <button class="exp-tab active" onclick="switchExpTab('chapters', this)">18 Chapters</button>
+            <button class="exp-tab" onclick="switchExpTab('topics', this)">Topics</button>
+            <button class="exp-tab" onclick="switchExpTab('all', this)">All Shlokas</button>
+          </div>
+
+          <!-- Chapters View -->
+          <div id="expChapters" class="exp-view">
+            <div class="chapters-list" id="chaptersList"></div>
+          </div>
+
+          <!-- Topics View -->
+          <div id="expTopics" class="exp-view hidden">
+            <div class="topics-grid" id="topicsGrid"></div>
+          </div>
+
+          <!-- All Shlokas View -->
+          <div id="expAll" class="exp-view hidden">
+            <div class="shlokas-list" id="allShlokasList"></div>
+          </div>
+
+          <div class="bottom-spacer"></div>
+        </div>
+      </section>
+
+      <!-- ═══════════════ REFLECT & SAVED (MERGED) ═══════════════ -->
+      <section class="screen" id="screen-reflect">
+        <div class="screen-scroll">
+
+          <!-- Tabs -->
+          <div class="explore-tabs">
+            <button class="exp-tab active" onclick="switchReflectTab('reflect', this)">Reflect</button>
+            <button class="exp-tab" onclick="switchReflectTab('bookmarks', this)">Bookmarks</button>
+            <button class="exp-tab" onclick="switchReflectTab('notes', this)">Notes</button>
+            <button class="exp-tab" onclick="switchReflectTab('progress', this)">Progress</button>
+          </div>
+
+          <!-- Reflect Tab -->
+          <div id="reflectContent">
+
+            <!-- Mood Tracker -->
+            <div class="section-label">MOOD JOURNAL</div>
+            <div class="mood-tracker-card">
+              <h3>How is your heart today?</h3>
+              <div class="mood-selector" id="reflectMoodSelector"></div>
+              <div class="mood-history" id="moodHistory"></div>
+            </div>
+
+            <!-- Guided Reflection -->
+            <div class="section-label">GUIDED REFLECTION</div>
+            <div class="reflection-card" id="reflectionCard">
+              <div class="reflection-icon">🧘</div>
+              <h3>Daily 5-Minute Reflection</h3>
+              <p>Listen · Reflect · Apply</p>
+              <div class="reflection-prompts" id="reflectionPromptsContainer">
+                <div class="reflection-prompt active" data-step="0">
+                  <div class="prompt-num">1 of 3</div>
+                  <p class="prompt-question" id="promptQ1">What is the most important duty you are avoiding today?</p>
+                </div>
+              </div>
+              <button class="start-reflection-btn" onclick="startGuidedReflection()">Begin Reflection</button>
+            </div>
+
+            <!-- Personal Journal -->
+            <div class="section-label">PERSONAL JOURNAL</div>
+            <div class="journal-section">
+              <button class="new-entry-btn" onclick="openNewJournalEntry()">
+                <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                New Journal Entry
+              </button>
+              <div class="journal-entries" id="journalEntries"></div>
+            </div>
+
+          </div><!-- end reflectContent -->
+
+          <!-- Bookmarks Tab -->
+          <div id="savedBookmarks" class="hidden">
+            <div class="shlokas-list" id="bookmarksList">
+              <div class="empty-state">
+                <div class="empty-icon">🔖</div>
+                <p>No bookmarks yet</p>
+                <span>Tap the bookmark icon on any shloka</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Notes Tab -->
+          <div id="savedNotes" class="hidden">
+            <div class="notes-list" id="notesList">
+              <div class="empty-state">
+                <div class="empty-icon">📝</div>
+                <p>No notes yet</p>
+                <span>Add notes while reading shlokas</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Progress Tab -->
+          <div id="savedProgress" class="hidden">
+            <div class="progress-section" id="progressSection"></div>
+          </div>
+
+          <div class="bottom-spacer"></div>
+        </div>
+      </section>
+
+      <!-- ═══════════════ SHOP SCREEN ═══════════════ -->
+      <section class="screen" id="screen-shop">
+        <div class="screen-scroll">
+
+          <!-- Donation Hero -->
+          <div class="donate-hero">
+            <div class="donate-hero-content">
+              <div class="donate-hero-emoji">🙏</div>
+              <h2 class="donate-hero-title">Support Dharma</h2>
+              <p class="donate-hero-sub">Protect cows · Spread Gita · Preserve our culture</p>
+            </div>
+          </div>
+
+          <!-- Donation Causes -->
+          <div class="section-label">DONATE TO A CAUSE</div>
+          <div id="donationCauses"></div>
+
+          <!-- Shop Header -->
+          <div class="shop-section-header">
+            <div class="section-label" style="margin:0">SPIRITUAL SHOP</div>
+            <span class="shop-badge">Order via WhatsApp</span>
+          </div>
+
+          <!-- Shop Tabs -->
+          <div class="shop-tabs">
+            <button class="shop-tab active" onclick="switchShopTab('all', this)">All</button>
+            <button class="shop-tab" onclick="switchShopTab('puja', this)">Puja</button>
+            <button class="shop-tab" onclick="switchShopTab('books', this)">Books</button>
+            <button class="shop-tab" onclick="switchShopTab('counter', this)">Mala</button>
+            <button class="shop-tab" onclick="switchShopTab('frames', this)">Frames</button>
+          </div>
+
+          <!-- Products Grid -->
+          <div class="products-grid" id="productsGrid"></div>
+
+          <div class="bottom-spacer"></div>
+        </div>
+      </section>
+
+    </main><!-- end screens-container -->
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+      <button class="nav-btn active" id="nav-home" onclick="navigateTo('home')">
+        <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <span>Home</span>
+      </button>
+      <button class="nav-btn" id="nav-guide" onclick="navigateTo('guide')">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span>Guide</span>
+      </button>
+      <button class="nav-btn" id="nav-explore" onclick="navigateTo('explore')">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <span>Explore</span>
+      </button>
+      <button class="nav-btn" id="nav-reflect" onclick="navigateTo('reflect')">
+        <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        <span>My Space</span>
+      </button>
+      <button class="nav-btn" id="nav-shop" onclick="navigateTo('shop')">
+        <svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+        <span>Shop</span>
+      </button>
+    </nav>
+
+  </div><!-- end #app -->
+
+  <!-- ═══════════════ MODALS ═══════════════ -->
+
+  <!-- Shloka Detail Modal -->
+  <div class="modal-overlay hidden" id="shlokaModal" onclick="closeShlokaModal(event)">
+    <div class="modal-card" id="shlokaModalContent">
+      <button class="modal-close" onclick="closeShlokaModal()">✕</button>
+      <div id="shlokaDetailBody"></div>
+    </div>
+  </div>
+
+  <!-- Journal Entry Modal -->
+  <div class="modal-overlay hidden" id="journalModal" onclick="closeJournalModal(event)">
+    <div class="modal-card">
+      <button class="modal-close" onclick="closeJournalModal()">✕</button>
+      <h3 class="modal-title">Journal Entry</h3>
+      <div class="mood-mini-selector" id="journalMoodSelector"></div>
+      <textarea id="journalTextarea" class="journal-textarea" placeholder="Write your thoughts, reflections, and feelings here..."></textarea>
+      <button class="save-btn" onclick="saveJournalEntry()">Save Entry</button>
+    </div>
+  </div>
+
+  <!-- Note Modal -->
+  <div class="modal-overlay hidden" id="noteModal" onclick="closeNoteModal(event)">
+    <div class="modal-card">
+      <button class="modal-close" onclick="closeNoteModal()">✕</button>
+      <h3 class="modal-title">My Note</h3>
+      <p class="note-shloka-ref" id="noteShlokRef"></p>
+      <textarea id="noteTextarea" class="journal-textarea" placeholder="Write your personal reflection on this shloka..."></textarea>
+      <button class="save-btn" onclick="saveNote()">Save Note</button>
+    </div>
+  </div>
+
+  <!-- Guided Reflection Modal -->
+  <div class="modal-overlay hidden" id="reflectionModal" onclick="closeReflectionModal(event)">
+    <div class="modal-card reflection-modal-card">
+      <button class="modal-close" onclick="closeReflectionModal()">✕</button>
+      <div class="reflection-session" id="reflectionSession"></div>
+    </div>
+  </div>
+
+  <!-- Share Modal -->
+  <div class="modal-overlay hidden" id="shareModal" onclick="closeShareModal(event)">
+    <div class="modal-card share-modal-card">
+      <button class="modal-close" onclick="closeShareModal()">✕</button>
+      <h3 class="modal-title">Share Wisdom</h3>
+      <div class="share-card-preview" id="shareCardPreview"></div>
+      <div class="share-actions">
+        <button class="share-btn" onclick="copyShareText()">
+          <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          Copy Text
+        </button>
+        <button class="share-btn whatsapp" onclick="shareWhatsApp()">
+          <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          WhatsApp
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Donation Modal -->
+  <div class="modal-overlay hidden" id="donateModal" onclick="closeDonateModal(event)">
+    <div class="modal-card donate-modal-card">
+      <button class="modal-close" onclick="closeDonateModal()">✕</button>
+      <div id="donateModalBody"></div>
+    </div>
+  </div>
+
+  <!-- Product Modal -->
+  <div class="modal-overlay hidden" id="productModal" onclick="closeProductModal(event)">
+    <div class="modal-card product-modal-card">
+      <button class="modal-close" onclick="closeProductModal()">✕</button>
+      <div id="productModalBody"></div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="toast" id="toast"></div>
+
+  <!-- ═══════════════ AUTH SCREENS ═══════════════ -->
+
+  <!-- Auth Overlay (shown before main app) -->
+  <div id="authOverlay" class="auth-overlay hidden">
+
+    <!-- Login Screen -->
+    <div id="authLogin" class="auth-screen active">
+      <div class="auth-bg"></div>
+      <div class="auth-content">
+        <div class="auth-hero">
+          <div class="auth-om">ॐ</div>
+          <h1 class="auth-app-name">KrishnaVerse</h1>
+          <p class="auth-tagline">Daily Gita Wisdom</p>
+        </div>
+        <div class="auth-card">
+          <h2 class="auth-card-title">Welcome Back</h2>
+          <p class="auth-card-sub">Jai Shri Krishna 🙏</p>
+
+          <label class="auth-label">Email</label>
+          <input type="email" id="loginEmail" class="auth-input" placeholder="your@email.com" autocomplete="email" />
+
+          <label class="auth-label">Password</label>
+          <div class="auth-pass-row">
+            <input type="password" id="loginPassword" class="auth-input" placeholder="••••••••" autocomplete="current-password" />
+            <button class="auth-eye-btn" onclick="toggleAuthPass('loginPassword', this)">👁️</button>
+          </div>
+
+          <button class="auth-forgot-btn" onclick="handleForgotPassword()">Forgot password?</button>
+
+          <div id="loginError" class="auth-error hidden"></div>
+
+          <button class="auth-btn auth-btn-primary" onclick="handleLogin()" id="loginBtn">
+            Sign In
+          </button>
+
+          <div class="auth-divider"><span>New to KrishnaVerse?</span></div>
+
+          <button class="auth-btn auth-btn-outline" onclick="switchAuthScreen('register')">
+            Create Account
+          </button>
+        </div>
+        <p class="auth-quote">"You have a right to perform your duties, but never to the fruits."</p>
+        <p class="auth-quote-ref">— Bhagavad Gita 2.47</p>
+      </div>
+    </div>
+
+    <!-- Register Screen -->
+    <div id="authRegister" class="auth-screen hidden">
+      <div class="auth-bg"></div>
+      <div class="auth-content">
+        <div class="auth-hero">
+          <div class="auth-om">ॐ</div>
+          <h1 class="auth-app-name">KrishnaVerse</h1>
+          <p class="auth-tagline">Begin Your Journey</p>
+        </div>
+        <div class="auth-card">
+          <h2 class="auth-card-title">Create Account</h2>
+          <p class="auth-card-sub">Your spiritual journey starts here 🙏</p>
+
+          <label class="auth-label">Your Name</label>
+          <input type="text" id="regName" class="auth-input" placeholder="Arjuna Das" autocomplete="name" />
+
+          <label class="auth-label">Email</label>
+          <input type="email" id="regEmail" class="auth-input" placeholder="your@email.com" autocomplete="email" />
+
+          <label class="auth-label">Password</label>
+          <div class="auth-pass-row">
+            <input type="password" id="regPassword" class="auth-input" placeholder="Min. 6 characters" autocomplete="new-password" oninput="updatePasswordStrength(this.value)" />
+            <button class="auth-eye-btn" onclick="toggleAuthPass('regPassword', this)">👁️</button>
+          </div>
+          <div class="auth-strength-row hidden" id="strengthRow">
+            <div class="auth-strength-bar" id="strengthBar"></div>
+            <span class="auth-strength-label" id="strengthLabel"></span>
+          </div>
+
+          <label class="auth-label">Confirm Password</label>
+          <input type="password" id="regConfirm" class="auth-input" placeholder="Re-enter password" autocomplete="new-password" />
+
+          <div id="registerError" class="auth-error hidden"></div>
+
+          <button class="auth-btn auth-btn-primary" onclick="handleRegister()" id="registerBtn">
+            Create Account
+          </button>
+
+          <p class="auth-terms">By creating an account you agree to our Terms of Service.</p>
+
+          <button class="auth-btn auth-btn-outline" onclick="switchAuthScreen('login')">
+            Already have an account? Sign In
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end authOverlay -->
+
+  <!-- User Menu in Header (injected after login) -->
+  <div class="user-menu hidden" id="userMenu">
+    <button class="user-avatar-btn" id="userAvatarBtn" onclick="toggleUserDropdown()">
+      <span id="userInitial">U</span>
+    </button>
+    <div class="user-dropdown hidden" id="userDropdown">
+      <div class="user-dropdown-name" id="userDropdownName">User</div>
+      <div class="user-dropdown-email" id="userDropdownEmail"></div>
+      <hr class="user-dropdown-sep" />
+      <button class="user-dropdown-item" onclick="handleSignOut()">Sign Out</button>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script type="module" src="auth.js"></script>
+  <script src="data/shlokas.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
